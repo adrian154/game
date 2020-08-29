@@ -1,10 +1,8 @@
-//const mapdata = "[[[-105,-19],[-103,-30],[-84,-37],[-62,-38],[-46,-25],[-44,-14],[-41,1],[-51,15],[-62,35],[-82,47],[-96,75],[-98,91],[-63,110],[-53,117],[-36,126],[-25,117],[-14,110],[-13,95],[-18,79],[-22,45],[-21,41],[-3,37],[11,47],[20,69],[22,95],[21,141],[28,179],[4,204],[-45,216],[-101,213],[-125,207],[-136,203],[-144,193],[-150,184],[-161,171],[-166,148],[-169,127],[-167,87],[-177,37],[-183,11],[-183,-14],[-183,-14],[-172,-27],[-156,-41],[-135,-38],[-115,-36],[-107,-25]],[],[[85,-160],[36,-146],[-10,-125],[-3,-42],[82,1],[92,-66],[102,-64],[104,-55],[104,-46],[104,-35],[107,-25],[122,-24],[128,-24],[141,-48],[138,-70],[145,-102],[141,-128],[122,-163],[112,-189],[100,-204],[70,-207],[23,-212],[-50,-191],[-120,-152],[-119,-150],[-106,-139],[-80,-149],[-53,-158],[-47,-162],[0,-171],[24,-188],[40,-177],[56,-167],[76,-163],[86,-158]]]";
-
 class World {
 
-    constructor(JSONData) {
+    constructor(data) {
         
-        this.terrain = JSON.parse(JSONData);
+        this.terrain = data;
 
     }
 
@@ -59,7 +57,7 @@ class Renderer {
     }
 
     render() {
-        
+
         // Preserve transform
         let preTransform = this.ctx.getTransform();
 
@@ -95,13 +93,16 @@ class Game {
         this.socket.addEventListener("close", event => this.ready = false);
 
         this.renderer = new Renderer(this, document.getElementById("gameCanvas"));
-        //this.world = new World(mapdata);
 
     }
 
     handleGameStart(message) {
         
-        ready = true;
+        console.log(this);
+        this.ready = true;
+        
+        // Set up world
+        this.world = new World(message.mapData);
 
     }
 
@@ -111,7 +112,7 @@ class Game {
         
         // Dispatch appropriate handler
         ({
-            "gameStart": this.handleGameStart,
+            "gameStart": message => this.handleGameStart(message),
         })[message.type](message);
 
     }
@@ -129,12 +130,12 @@ class Game {
 
         } else {
 
-            this.renderer.render();
-
-            // The function is necessary to avoid binding issues (`this` gets dissociated)
-            requestAnimationFrame(() => this.gameLoop());
+            // Render
+            this.renderer.render();        
         
         }
+
+        requestAnimationFrame(() => this.gameLoop());
 
     }
 
