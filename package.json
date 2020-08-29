@@ -1,0 +1,19 @@
+{
+  "name": "game",
+  "version": "1.0.0",
+  "description": "it's a game!",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adrian154/game.git"
+  },
+  "author": "Adrian Zhang",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/adrian154/game/issues"
+  },
+  "homepage": "https://github.com/adrian154/game#readme"
+}
