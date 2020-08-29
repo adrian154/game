@@ -3,14 +3,13 @@
 // Dependencies
 const Express = require("express");
 const WebSocket = require("ws");
-const optional = require("./optional.js");
 
 class App {
 
     constructor(options) {
 
-        this.initHTTPServ(optional(options, "httpPort", 80));
-        this.initWSServ(optional(options, "wsPort", 8080));
+        this.initHTTPServ(80);
+        this.gameServer = new GameServer();
     
     }
 
@@ -20,20 +19,31 @@ class App {
 
         this.httpServ.use("/", Express.static("public"));
 
-        this.httpServ.listen(port, () => {
-            console.log(`HTTP server listening on port ${port}`);
-        });
+        this.httpServ.listen(port);
 
     }
 
-    initWSServ(port) {
+}
+
+class GameServer {
+
+    constructor() {
 
         this.wsServ = new WebSocket.Server({
-            port: port
+            port: 8080
         });
 
-        console.log(`Websocket server listening on port ${port}`);
+        this.wsServ.on("connection", this.handleConnection);
+        this.wsServ.on("close", this.handleClose);
 
+    }
+
+    handleConnection(socket) {
+        console.log("connect");
+    }
+
+    handleClose() {
+        console.log("close");
     }
 
 }
