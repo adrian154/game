@@ -35,6 +35,8 @@ class Renderer {
         this.canvas = canvasElement;
         this.ctx = this.canvas.getContext("2d");
 
+        this.scale = 1;
+
         this.handleResize();
         window.addEventListener("resize", () => this.handleResize());
 
@@ -47,7 +49,7 @@ class Renderer {
     }
 
     getCameraTransform() {
-        return makeTransformFast(this.canvas.width / 2, this.canvas.height / 2, 1);
+        return makeTransformFast(this.canvas.width / 2, this.canvas.height / 2, this.scale);
     }
 
     renderWorld() {
@@ -104,13 +106,21 @@ class Game {
 
         this.canvas = document.getElementById("gameCanvas");
         this.renderer = new Renderer(this, this.canvas);
+
+        // Add even listeners
         this.canvas.addEventListener("click", event => this.handleClick(event));
+
+        document.addEventListener("wheel", event => this.handleScroll(event));
+
+    }
+
+    handleScroll(event) {
+
+        this.renderer.scale *= event.deltaY > 0 ? 1 / 1.5 : 1.5;
 
     }
 
     handleClick(event) {
-
-        console.log("click");
 
         // Get screen coordinates
         let box = this.canvas.getBoundingClientRect();
