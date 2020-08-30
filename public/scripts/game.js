@@ -94,30 +94,24 @@ class Renderer {
 
 }
 
-class Game {
+class Input {
 
-    constructor() {
+    constructor(canvas, renderer) {
 
-        this.socket = new WebSocket(`ws://${window.location.host}:8080`);
-        this.ready = false;
+        this.canvas = canvas;
+        this.renderer = renderer;
+        this.scrollLevel = 0;
 
-        this.socket.addEventListener("message", event => this.handleMessage(event));
-        this.socket.addEventListener("close", event => this.ready = false);
-
-        this.canvas = document.getElementById("gameCanvas");
-        this.renderer = new Renderer(this, this.canvas);
-
-        // Add even listeners
+        // Add event listeners
         this.canvas.addEventListener("click", event => this.handleClick(event));
 
-        this.scrollLevel = 0;
         document.addEventListener("wheel", event => this.handleScroll(event));
 
     }
 
     handleScroll(event) {
         this.scrollLevel += event.deltaY > 0 ? -1 : 1;
-        this.renderer.scale = Math.pow(1.5, this.scrollLevel)
+        this.renderer.scale = Math.pow(1.3, this.scrollLevel)
     }
 
     handleClick(event) {
@@ -130,6 +124,25 @@ class Game {
         // Invert canvas transform matrix
         let worldCoords = this.renderer.untransformCoords(x, y);
         console.log(worldCoords);
+
+    }
+
+
+}
+
+class Game {
+
+    constructor() {
+
+        this.socket = new WebSocket(`ws://${window.location.host}:8080`);
+        this.ready = false;
+
+        this.socket.addEventListener("message", event => this.handleMessage(event));
+        this.socket.addEventListener("close", event => this.ready = false);
+
+        this.canvas = document.getElementById("gameCanvas");
+        this.renderer = new Renderer(this, this.canvas);
+        this.input = new Input(this.canvas, this.renderer);
 
     }
 
