@@ -110,14 +110,14 @@ class Game {
         // Add even listeners
         this.canvas.addEventListener("click", event => this.handleClick(event));
 
+        this.scrollLevel = 0;
         document.addEventListener("wheel", event => this.handleScroll(event));
 
     }
 
     handleScroll(event) {
-
-        this.renderer.scale *= event.deltaY > 0 ? 1 / 1.5 : 1.5;
-
+        this.scrollLevel += event.deltaY > 0 ? -1 : 1;
+        this.renderer.scale = Math.pow(1.5, this.scrollLevel)
     }
 
     handleClick(event) {
