@@ -29,7 +29,11 @@ class App {
 }
 
 class Map {
-    
+
+    constructor() {
+        this.data = mapData;
+    }
+
 }
 
 class GameServer {
@@ -44,32 +48,42 @@ class GameServer {
         this.wsServ.on("connection", socket => this.handleConnection(socket));
         this.wsServ.on("close", () => this.handleClose());
 
+        this.map = new Map();
+
     }
 
     handlePlaceWall(message) {
 
-
+        console.log(message.points);
 
     }
 
-    handleMessage(message) {        
+    handleMessage(message, socket) {   
+        
+        message = JSON.parse(message);
 
         // Dispatch handler
-        ({
-            "placeWall": handlePlaceWall
-        })[message.type](message);
+        let handlers = {
+            placeWall: this.handlePlaceWall
+        };
+
+        if(handlers.hasOwnProperty(message.type)) {
+            (handlers[message.type])(message);
+        } else {
+            console.log(`WARNING: Unknown message type ${message.type}, ignoring`);
+        }
 
     }
 
     handleConnection(socket) {
         
         // Set up socket handlers
-        socket.on("message", this.handleMessage);
+        socket.on("message", message => this.handleMessage(message, socket));
 
         // Send gamestart
         socket.send(JSON.stringify({
             type: "gameStart",
-            mapData: mapData
+            mapData: this.map.data
         }));
 
     }

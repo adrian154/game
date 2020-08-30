@@ -10,6 +10,31 @@ const quadinp = function(x1, x2, y1, y2, t) {
     return y1 + ((-((t - dx) * (t - dx)) + dx2) / dx2) * (y2 - y1);
 };
 
+const inRange = function(val, v1, v2) {
+    return val > Math.min(v1, v2) && val < Math.max(v1, v2);
+};
+
+// From StackOverflow:
+// https://stackoverflow.com/questions/9043805/test-if-two-lines-intersect-javascript-function
+const intersectsComponent = function(a, b, c, d, p, q, r, s) {
+    let det, gamma, lambda;
+    det = (c - a) * (s - q) - (r - p) * (d - b);
+
+    if (det === 0) {
+        return false;
+    } else {
+        lambda = ((s - q) * (r - a) + (p - r) * (s - b)) / det;
+        gamma = ((b - d) * (r - a) + (c - a) * (s - b)) / det;
+        return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1);
+    }
+  };
+
+const intersects = function(a1, a2, b1, b2) {
+
+    return intersectsComponent(a1[0], a1[1], a2[0], a2[1], b1[0], b1[1], b2[0], b2[1]);
+
+}
+
 class World {
 
     constructor(data) {
@@ -35,6 +60,51 @@ class World {
             ctx.fill();
 
         }
+
+    }
+
+    
+    getContainingContinent(point) {
+
+        for(let continent of this.terrain) {
+
+            let isects = 0;
+            for(let i = 0; i < continent.length - 1; i++) {
+                
+                let v0 = continent[i];
+                let v1 = continent[i + 1];
+
+                if(inRange(point[1], v0[1], v1[1])) {
+                    let x = lininp(v0[1], v1[1], v0[0], v1[0], point[1]);
+                    console.log(x, v0[0], v1[0]);
+                    if(point[0] < x) {
+                        isects++;
+                    }
+                }
+
+            }
+
+            if(isects % 2 == 1) {
+                return continent;
+            }
+
+        }
+
+        return undefined;
+
+    }
+
+    clearPath(point1, point2) {
+
+        for(let continent of this.terrain) {
+            for(let i = 0; i < continent.length - 1; i++) {
+                if(intersects(point1, point2, continent[i], continent[i + 1])) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
 
     }
 
@@ -128,12 +198,14 @@ class Renderer {
 
         // Render layers...
         this.renderWorld();
+        
+        // draw debug nub
         this.ctx.setTransform(this.cameraTransform);
-
-        // draw
+        
+        let wc = this.untransformCoords(this.game.input.mouseX, this.game.input.mouseY);
+        wc = [wc[0][0], wc[1][0]];
         this.ctx.fillStyle = "#ff0000";
-        let ut = this.untransformCoords(this.game.input.mouseX, this.game.input.mouseY);
-        this.ctx.fillRect(ut[0][0], ut[1][0], 5, 5);
+        this.ctx.fillRect(wc[0], wc[1], 5, 5);
 
         // Reset for UI
         this.ctx.resetTransform();
@@ -191,8 +263,9 @@ Object.freeze(InputTask);
 
 class Input {
 
-    constructor(canvas, renderer) {
+    constructor(game, canvas, renderer) {
 
+        this.game = game;
         this.canvas = canvas;
         this.renderer = renderer;
         this.scrollLevel = 0;
@@ -287,13 +360,21 @@ class Input {
         let worldc = this.renderer.untransformCoords(this.mouseX, this.mouseY);
         let wx = worldc[0][0];
         let wy = worldc[1][0];
+        let wc = [wx, wy];
 
         if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS) {
-            this.points.push([wx, wy]);
+    
+            if(this.points.length == 0) {
+                this.points.push(wc);
+            } else if(this.game.world.clearPath(this.points[0], wc)) {
+                this.points.push(wc);
+            }
+
             if(this.points.length == 2) {
                 this.currentTask = InputTask.NONE;
                 game.remote.sendPlaceWall(this.points);
             }
+
         }
 
     }
@@ -327,7 +408,7 @@ class Game {
 
         this.canvas = document.getElementById("gameCanvas");
         this.renderer = new Renderer(this, this.canvas);
-        this.input = new Input(this.canvas, this.renderer);
+        this.input = new Input(this, this.canvas, this.renderer);
         this.remote = new Remote(this.socket);
 
     }
