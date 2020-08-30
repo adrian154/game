@@ -105,7 +105,6 @@ class World {
 
                 if(inRange(point[1], v0[1], v1[1])) {
                     let x = lininp(v0[1], v1[1], v0[0], v1[0], point[1]);
-                    console.log(x, v0[0], v1[0]);
                     if(point[0] < x) {
                         isects++;
                     }
