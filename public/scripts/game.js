@@ -4,6 +4,7 @@ class World {
         this.terrain = data;
     }
 
+    // Drawn in camera space
     render(ctx) {
 
         // Terrain
@@ -36,6 +37,8 @@ class Renderer {
         this.ctx = this.canvas.getContext("2d");
 
         this.scale = 1;
+        this.cameraX = 0;
+        this.cameraY = 0;
 
         this.handleResize();
         window.addEventListener("resize", () => this.handleResize());
@@ -48,27 +51,37 @@ class Renderer {
         this.canvas.height = box.height;
     }
 
-    getCameraTransform() {
-        return makeTransformFast(this.canvas.width / 2, this.canvas.height / 2, this.scale);
+    doCameraTransform() {
+        this.ctx.translate(this.cameraX, this.cameraY);
+        this.ctx.translate(this.scaleX, this.scaleY);
+        this.ctx.scale(this.scale, this.scale);
+        this.ctx.translate(-this.scaleX, -this.scaleY);
     }
 
     renderWorld() {
-
-        // Backdrop
-        this.ctx.fillStyle = "#03b6fc";
-        this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
-
-        this.ctx.setTransform(this.getCameraTransform());
-
+        
         // Render world
         this.game.world.render(this.ctx);
-
+    
     }
 
     render() {
 
         // Preserve transform
         this.ctx.resetTransform();
+
+        // Backdrop
+        this.ctx.fillStyle = "#03b6fc";
+        this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+
+        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+
+        // Set up camera transform
+        this.doCameraTransform();
+        this.cameraTransform = this.ctx.getTransform();
+
+        this.renderWorld();
+        this.ctx.setTransform(this.cameraTransform);
 
         // Render layers here...
         this.renderWorld();
@@ -88,8 +101,14 @@ class Renderer {
 
     }
 
+    setScale(x, y, scale) {
+        this.scaleX = x;
+        this.scaleY = y;
+        this.scale = scale;
+    }
+
     untransformCoords(x, y) {
-        return mulMatrix(invertMatrix3x3(transformToMatrix(this.getCameraTransform())), [[x], [y], [1]]);
+        return mulMatrix(invertMatrix3x3(transformToMatrix(this.cameraTransform)), [[x], [y], [1]]);
     }
 
 }
@@ -102,31 +121,66 @@ class Input {
         this.renderer = renderer;
         this.scrollLevel = 0;
 
+        this.mouseDown = false;
+        this.mouseMoved = false; // Used to determine whether mouse moved in between clicks
+        this.mouseX = 0; // screen
+        this.mouseY = 0; // screen
+
         // Add event listeners
-        this.canvas.addEventListener("click", event => this.handleClick(event));
+        this.canvas.addEventListener("mousedown", event => this.handleMouseDown(event));
+        this.canvas.addEventListener("mouseup", event => this.handleMouseUp(event));
+        this.canvas.addEventListener("mousemove", event => this.handleMouseMove(event));
 
         document.addEventListener("wheel", event => this.handleScroll(event));
 
     }
 
     handleScroll(event) {
-        this.scrollLevel += event.deltaY > 0 ? -1 : 1;
-        this.renderer.scale = Math.pow(1.3, this.scrollLevel)
+        
+        let fac = event.deltaY > 0 ? -1 : 1;
+        this.scrollLevel += fac;
+
+        let worldc = this.renderer.untransformCoords(this.mouseX, this.mouseY);
+        let wx = worldc[0][0];
+        let wy = worldc[1][0];
+        
+        this.renderer.setScale(wx, wy, Math.pow(1.3, this.scrollLevel));
+
+    }
+
+    handleMouseDown(event) {
+        this.mouseDown = true;
+        this.mouseMoved = false;
+    }
+
+    handleMouseUp(event) {
+
+        this.mouseDown = false;
+        if(!this.mouseMoved) {
+            this.handleClick(event);
+        }
+
+    }
+
+    handleMouseMove(event) {
+        
+        this.mouseMoved = true;
+
+        let box = this.canvas.getBoundingClientRect();
+        this.mouseX = event.clientX - box.left;
+        this.mouseY = event.clientY - box.top;
+
+        // Drag
+        if(this.mouseDown) {
+            this.renderer.cameraX += event.movementX;
+            this.renderer.cameraY += event.movementY;
+        }
+
     }
 
     handleClick(event) {
 
-        // Get screen coordinates
-        let box = this.canvas.getBoundingClientRect();
-        let x = event.clientX - box.left;
-        let y = event.clientY - box.top;
-
-        // Invert canvas transform matrix
-        let worldCoords = this.renderer.untransformCoords(x, y);
-        console.log(worldCoords);
-
     }
-
 
 }
 
@@ -147,8 +201,7 @@ class Game {
     }
 
     handleGameStart(message) {
-        
-        console.log(this);
+    
         this.ready = true;
         
         // Set up world

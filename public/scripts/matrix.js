@@ -23,7 +23,6 @@ const getCol = function(matrix, col) {
 
 const dot = function(vec1, vec2) {
 
-    console.log(vec1, vec2);
     if(vec1.length !== vec2.length) throw new Error("Can't take dot product of unequal length vectors!");
 
     let result = 0;
