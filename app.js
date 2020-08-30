@@ -28,6 +28,10 @@ class App {
 
 }
 
+class Map {
+    
+}
+
 class GameServer {
 
     constructor() {
@@ -42,9 +46,18 @@ class GameServer {
 
     }
 
-    handleMessage(message) {
+    handlePlaceWall(message) {
 
-        
+
+
+    }
+
+    handleMessage(message) {        
+
+        // Dispatch handler
+        ({
+            "placeWall": handlePlaceWall
+        })[message.type](message);
 
     }
 

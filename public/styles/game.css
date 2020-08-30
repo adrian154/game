@@ -25,6 +25,13 @@ body {
     height: 100%;
 }
 
+#sidebar button {
+    border: none;
+    border-radius: 5px;
+    padding: 1.0em;
+    font-size: 1.0em;
+}
+
 #gameArea {
     flex-basis: 80%;
     height: 100%;
