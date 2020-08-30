@@ -35,16 +35,35 @@ const intersects = function(a1, a2, b1, b2) {
 
 }
 
+class Wall {
+
+    constructor(point1, point2) {
+        this.point1 = point1;
+        this.point2 = point2;
+    }
+
+    render(ctx) {
+        ctx.strokeStyle = "#a6a6a6";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(this.point1[0], this.point1[1]);
+        ctx.lineTo(this.point2[0], this.point2[1]);
+        ctx.closePath();
+        ctx.stroke();
+    }
+
+}
+
 class World {
 
     constructor(data) {
         this.terrain = data;
+        this.objects = [];
     }
 
     // Drawn in camera space
-    render(ctx) {
+    renderTerrain(ctx) {
 
-        // Terrain
         for(let continent of this.terrain) {
 
             if(continent.length < 1)
@@ -59,6 +78,16 @@ class World {
             ctx.closePath();
             ctx.fill();
 
+        }
+
+    }
+
+    renderObjects(ctx) {
+
+        for(let object of this.objects) {
+            let pre = ctx.getTransform();
+            object.render(ctx);
+            ctx.setTransform(pre);
         }
 
     }
@@ -158,13 +187,6 @@ class Renderer {
 
     }
 
-    renderWorld() {
-        
-        // Render world
-        this.game.world.render(this.ctx);
-    
-    }
-
     renderUI() {
 
         let taskText = "";
@@ -197,8 +219,15 @@ class Renderer {
         this.cameraTransform = this.ctx.getTransform();
 
         // Render layers...
-        this.renderWorld();
+        this.game.world.renderTerrain(this.ctx);
         
+        this.ctx.setTransform(this.cameraTransform);
+        this.game.world.renderObjects(this.ctx);
+
+        this.ctx.setTransform(this.cameraTransform);
+        this.game.input.renderPreview(this.ctx);
+
+
         // draw debug nub
         this.ctx.setTransform(this.cameraTransform);
         
@@ -206,6 +235,9 @@ class Renderer {
         wc = [wc[0][0], wc[1][0]];
         this.ctx.fillStyle = "#ff0000";
         this.ctx.fillRect(wc[0], wc[1], 5, 5);
+
+
+
 
         // Reset for UI
         this.ctx.resetTransform();
@@ -353,6 +385,14 @@ class Input {
             this.renderer.cameraY += event.movementY;
         }
 
+        if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS) {
+            let worldc = this.renderer.untransformCoords(this.mouseX, this.mouseY);
+            let wx = worldc[0][0];
+            let wy = worldc[1][0];
+            let wc = [wx, wy];
+            this.worldCoords = wc;
+        }
+
     }
 
     handleClick(event) {
@@ -361,6 +401,7 @@ class Input {
         let wx = worldc[0][0];
         let wy = worldc[1][0];
         let wc = [wx, wy];
+        this.worldCoords = wc;
 
         if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS) {
     
@@ -376,6 +417,25 @@ class Input {
             }
 
         }
+
+    }
+
+    // Draw preview for stuff
+    renderPreview(ctx) {
+
+        ctx.globalAlpha = 0.5;
+
+        if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS) {
+
+            if(this.points.length == 1) {
+                let previewObj = new Wall(this.points[0],  this.worldCoords);
+                console.log(this.points[0], this.worldCoords);
+                previewObj.render(ctx);
+            }
+
+        }
+
+        ctx.globalAlpha = 1.0;
 
     }
 
@@ -422,6 +482,17 @@ class Game {
 
     }
 
+    handleAddObject(message) {
+        
+        // convert JSON object to real object
+        let transformers = {
+            "wall": obj => new Wall(obj.point1, obj.point2),
+        };
+
+        this.world.objects.push(transformers[message.object.type](message.object));
+
+    }
+
     handleMessage(event) {
 
         let message = JSON.parse(event.data);
@@ -429,6 +500,7 @@ class Game {
         // Dispatch appropriate handler
         ({
             "gameStart": message => this.handleGameStart(message),
+            "addObject": message => this.handleAddObject(message)
         })[message.type](message);
 
     }

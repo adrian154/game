@@ -54,7 +54,17 @@ class GameServer {
 
     handlePlaceWall(message) {
 
-        console.log(message.points);
+        // Assume the wall is valid.
+        for(let socket of this.wsServ.clients) {
+            socket.send(JSON.stringify({
+                type: "addObject",
+                object: {
+                    type: "wall",
+                    point1: message.points[0],
+                    point2: message.points[1]
+                }
+            }));
+        }
 
     }
 
@@ -64,7 +74,7 @@ class GameServer {
 
         // Dispatch handler
         let handlers = {
-            placeWall: this.handlePlaceWall
+            placeWall: message => this.handlePlaceWall(message)
         };
 
         if(handlers.hasOwnProperty(message.type)) {
