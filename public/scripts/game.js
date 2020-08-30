@@ -1,16 +1,10 @@
 class World {
 
     constructor(data) {
-        
         this.terrain = data;
-
     }
 
     render(ctx) {
-
-        // Backdrop
-        ctx.fillStyle = "#03b6fc";
-        ctx.fillRect(-ctx.canvas.width / 2, -ctx.canvas.height / 2, ctx.canvas.width, ctx.canvas.height);
 
         // Terrain
         for(let continent of this.terrain) {
@@ -58,6 +52,10 @@ class Renderer {
 
     renderWorld() {
 
+        // Backdrop
+        this.ctx.fillStyle = "#03b6fc";
+        this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+
         this.ctx.setTransform(this.getCameraTransform());
 
         // Render world
@@ -72,6 +70,7 @@ class Renderer {
 
         // Render layers here...
         this.renderWorld();
+
     }
 
     renderNotReady() {
