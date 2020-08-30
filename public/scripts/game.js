@@ -10,10 +10,7 @@ class World {
 
         // Backdrop
         ctx.fillStyle = "#03b6fc";
-        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-        // Transform
-        ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2);
+        ctx.fillRect(-ctx.canvas.width / 2, -ctx.canvas.height / 2, ctx.canvas.width, ctx.canvas.height);
 
         // Terrain
         for(let continent of this.terrain) {
@@ -50,21 +47,31 @@ class Renderer {
     }
 
     handleResize() {
-        console.log("resized!");
         let box = this.canvas.getBoundingClientRect();
         this.canvas.width = box.width;
         this.canvas.height = box.height;
     }
 
+    getCameraTransform() {
+        return makeTransformFast(this.canvas.width / 2, this.canvas.height / 2, 1);
+    }
+
+    renderWorld() {
+
+        this.ctx.setTransform(this.getCameraTransform());
+
+        // Render world
+        this.game.world.render(this.ctx);
+
+    }
+
     render() {
 
         // Preserve transform
-        let preTransform = this.ctx.getTransform();
+        this.ctx.resetTransform();
 
         // Render layers here...
-        this.game.world.render(this.ctx);
-        this.ctx.setTransform(preTransform);
-
+        this.renderWorld();
     }
 
     renderNotReady() {
@@ -80,6 +87,10 @@ class Renderer {
 
     }
 
+    untransformCoords(x, y) {
+        return mulMatrix(invertMatrix3x3(transformToMatrix(this.getCameraTransform())), [[x], [y], [1]]);
+    }
+
 }
 
 class Game {
@@ -92,7 +103,24 @@ class Game {
         this.socket.addEventListener("message", event => this.handleMessage(event));
         this.socket.addEventListener("close", event => this.ready = false);
 
-        this.renderer = new Renderer(this, document.getElementById("gameCanvas"));
+        this.canvas = document.getElementById("gameCanvas");
+        this.renderer = new Renderer(this, this.canvas);
+        this.canvas.addEventListener("click", event => this.handleClick(event));
+
+    }
+
+    handleClick(event) {
+
+        console.log("click");
+
+        // Get screen coordinates
+        let box = this.canvas.getBoundingClientRect();
+        let x = event.clientX - box.left;
+        let y = event.clientY - box.top;
+
+        // Invert canvas transform matrix
+        let worldCoords = this.renderer.untransformCoords(x, y);
+        console.log(worldCoords);
 
     }
 
