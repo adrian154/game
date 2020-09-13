@@ -112,6 +112,7 @@ class Renderer {
         this.scale = 1;
         this.cameraX = 0;
         this.cameraY = 0;
+        this.cameraAngle = 0;
 
         // For animation, etc.
         this.frame = 0;
@@ -139,19 +140,16 @@ class Renderer {
         }
     }
 
-    // Does no translation, just scaling rotation etc.
-    getVectorTransform() {
-        this.ctx.scale(this.scale, this.scale);
-    }
-
     updateAnimations() {
         this.interpolateScaling();
     }
 
     doCameraTransform() {
-
+        
         this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.scale(this.scale, this.scale);
         this.ctx.translate(this.cameraX, this.cameraY);
+        this.ctx.rotate(this.cameraAngle);
 
         this.cameraTransform = this.ctx.getTransform();
 
@@ -284,6 +282,7 @@ class Input {
         this.mouseY = 0; // screen
 
         this.currentTask = InputTask.NONE;
+        this.ctrlHeld = false; // ctrl toggles rotation mode
 
         // Add event listeners..
         
@@ -299,11 +298,21 @@ class Input {
         document.addEventListener("wheel", event => this.handleScroll(event));
 
         // ..on window
-        window.addEventListener("keydown", event => this.handleKey(event, false));
+        window.addEventListener("keydown", event => this.handleKey(event, true));
+        window.addEventListener("keyup", event => this.handleKey(event, false));
 
     }
 
     handleKey(event, state) {
+
+        // Don't listen to repeat events
+        if(event.repeat) return;
+
+        console.log(event.key, state);
+
+        if(event.key === "Control") {
+            this.ctrlHeld = state;
+        }
 
         if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS && event.key === "escape") {
             this.currentTask = InputTask.NONE;
@@ -332,6 +341,8 @@ class Input {
     handleMouseDown(event) {
         this.mouseDown = true;
         this.mouseMoved = false;
+
+        event.preventDefault();
     }
 
     handleMouseUp(event) {
@@ -341,6 +352,7 @@ class Input {
             this.handleClick(event);
         }
 
+        event.preventDefault();
     }
 
     handleMouseMove(event) {
@@ -352,13 +364,21 @@ class Input {
 
         // Drag
         if(this.mouseDown) {
-            this.renderer.cameraX += event.movementX;
-            this.renderer.cameraY += event.movementY;
+            if(this.ctrlHeld) {
+                let angleBefore = Math.atan2(this.mouseY - event.movementY - this.canvas.height / 2, this.mouseX - event.movementX - this.canvas.width / 2);
+                let angleNow = Math.atan2(this.mouseY - this.canvas.height / 2, this.mouseX - this.canvas.width / 2);
+                this.renderer.cameraAngle += angleNow - angleBefore;
+            } else {
+                this.renderer.cameraX += event.movementX;
+                this.renderer.cameraY += event.movementY;
+            }
         }
 
         if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS) {
             this.worldCoords = this.renderer.untransformCoords(this.mouseX, this.mouseY);;
         }
+
+        event.preventDefault();
 
     }
 
