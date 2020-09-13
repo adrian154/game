@@ -241,11 +241,11 @@ class Renderer {
         this.zoomY = y;
 
         if(this.interpScale) {
-            this.scaleInterpEndFrame = this.frame + 1;
+            this.scaleInterpEndFrame = this.frame + 10;
             this.scaleEnd = scale;
         } else {
             this.scaleInterpStartFrame = this.frame;
-            this.scaleInterpEndFrame = this.frame + 1;
+            this.scaleInterpEndFrame = this.frame + 10;
             this.scaleStart = this.scale;
             this.scaleEnd = scale;
             this.interpScale = true;
@@ -369,8 +369,8 @@ class Input {
                 let angleNow = Math.atan2(this.mouseY - this.canvas.height / 2, this.mouseX - this.canvas.width / 2);
                 this.renderer.cameraAngle += angleNow - angleBefore;
             } else {
-                this.renderer.cameraX += event.movementX;
-                this.renderer.cameraY += event.movementY;
+                this.renderer.cameraX += event.movementX / this.renderer.scale;
+                this.renderer.cameraY += event.movementY / this.renderer.scale;
             }
         }
 
