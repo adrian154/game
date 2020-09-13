@@ -1,40 +1,3 @@
-const lininp = function(x1, x2, y1, y2, t) {
-    t = t - x1;
-    return y1 + (t / (x2 - x1)) * (y2 - y1);
-};
-
-const quadinp = function(x1, x2, y1, y2, t) {
-    t = t - x1;
-    let dx = x2 - x1;
-    let dx2 = dx * dx;
-    return y1 + ((-((t - dx) * (t - dx)) + dx2) / dx2) * (y2 - y1);
-};
-
-const inRange = function(val, v1, v2) {
-    return val > Math.min(v1, v2) && val < Math.max(v1, v2);
-};
-
-// From StackOverflow:
-// https://stackoverflow.com/questions/9043805/test-if-two-lines-intersect-javascript-function
-const intersectsComponent = function(a, b, c, d, p, q, r, s) {
-    let det, gamma, lambda;
-    det = (c - a) * (s - q) - (r - p) * (d - b);
-
-    if (det === 0) {
-        return false;
-    } else {
-        lambda = ((s - q) * (r - a) + (p - r) * (s - b)) / det;
-        gamma = ((b - d) * (r - a) + (c - a) * (s - b)) / det;
-        return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1);
-    }
-  };
-
-const intersects = function(a1, a2, b1, b2) {
-
-    return intersectsComponent(a1[0], a1[1], a2[0], a2[1], b1[0], b1[1], b2[0], b2[1]);
-
-}
-
 class Wall {
 
     constructor(point1, point2) {
@@ -104,7 +67,7 @@ class World {
                 let v1 = continent[i + 1];
 
                 if(inRange(point[1], v0[1], v1[1])) {
-                    let x = lininp(v0[1], v1[1], v0[0], v1[0], point[1]);
+                    let x = interpLinear(v0[1], v1[1], v0[0], v1[0], point[1]);
                     if(point[0] < x) {
                         isects++;
                     }
@@ -122,7 +85,7 @@ class World {
 
     }
 
-    clearPath(point1, point2) {
+    hasClearPath(point1, point2) {
 
         for(let continent of this.terrain) {
             for(let i = 0; i < continent.length - 1; i++) {
@@ -165,24 +128,32 @@ class Renderer {
         this.canvas.height = box.height;
     }
 
-    doCameraTransform() {
-
-        this.ctx.translate(this.cameraX, this.cameraY);
-
-        this.ctx.translate(this.scaleX, this.scaleY);
-        
-        // interpolate scaling here
+    interpolateScaling() {
         if(this.interpScale) {
             if(this.frame < this.scaleInterpEndFrame) {
-                this.scale = quadinp(this.scaleInterpStartFrame, this.scaleInterpEndFrame, this.scaleStart, this.scaleEnd, this.frame);
+                this.scale = interpQuadratic(this.scaleInterpStartFrame, this.scaleInterpEndFrame, this.scaleStart, this.scaleEnd, this.frame);
             } else {
                 this.scale = this.scaleEnd;
                 this.interpScale = false;
             }
         }
+    }
 
+    // Does no translation, just scaling rotation etc.
+    getVectorTransform() {
         this.ctx.scale(this.scale, this.scale);
-        this.ctx.translate(-this.scaleX, -this.scaleY);
+    }
+
+    updateAnimations() {
+        this.interpolateScaling();
+    }
+
+    doCameraTransform() {
+
+        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.translate(this.cameraX, this.cameraY);
+
+        this.cameraTransform = this.ctx.getTransform();
 
     }
 
@@ -194,14 +165,30 @@ class Renderer {
             taskText = `Placing a wall (pick two points by clicking, ${this.game.input.points.length}/2)`;
         }
 
+        let debugText = `Scale: ${this.scale}`;
+
         this.ctx.textAlign = "left";
         this.ctx.font = "24px Arial";
         this.ctx.fillStyle = "#ffffff";
         this.ctx.fillText(taskText, 10, 50);
+        this.ctx.fillText(debugText, 10, 70);
+        
+        this.ctx.fillText(`${this.cameraTransform.a}, ${this.cameraTransform.c}, ${this.cameraTransform.e}`, 10, 90);
+        this.ctx.fillText(`${this.cameraTransform.b}, ${this.cameraTransform.d}, ${this.cameraTransform.f}`, 10, 110);
+        this.ctx.fillText(`${0}, ${0}, ${1}`, 10, 130);
 
     }
 
+    drawDebugNub() {
+        let wc = this.untransformCoords(this.game.input.mouseX, this.game.input.mouseY);
+        this.ctx.fillStyle = "#ff0000";
+        this.ctx.fillRect(wc[0], wc[1], 5, 5);
+    }
+
     render() {
+
+        // Animate...
+        this.updateAnimations();
 
         // Preserve transform
         this.ctx.resetTransform();
@@ -210,39 +197,29 @@ class Renderer {
         this.ctx.fillStyle = "#03b6fc";
         this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
-        // Pre-camera transform
-        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
-
         // Set up camera transform
         this.doCameraTransform();
-        this.cameraTransform = this.ctx.getTransform();
 
         // Render layers...
         this.game.world.renderTerrain(this.ctx);
         
+        // draw objects
         this.ctx.setTransform(this.cameraTransform);
         this.game.world.renderObjects(this.ctx);
 
+        // draw previews
         this.ctx.setTransform(this.cameraTransform);
         this.game.input.renderPreview(this.ctx);
 
-
         // draw debug nub
         this.ctx.setTransform(this.cameraTransform);
-        
-        let wc = this.untransformCoords(this.game.input.mouseX, this.game.input.mouseY);
-        wc = [wc[0][0], wc[1][0]];
-        this.ctx.fillStyle = "#ff0000";
-        this.ctx.fillRect(wc[0], wc[1], 5, 5);
+        this.drawDebugNub();
 
-
-
-
-        // Reset for UI
+        // draw UI
         this.ctx.resetTransform();
-
         this.renderUI();
 
+        // Next frame!
         this.frame++;
 
     }
@@ -261,16 +238,16 @@ class Renderer {
     }
 
     setScale(x, y, scale) {
-        
-        this.scaleX = x;
-        this.scaleY = y;
+
+        this.zoomX = x;
+        this.zoomY = y;
 
         if(this.interpScale) {
-            this.scaleInterpEndFrame = this.frame + 12;
+            this.scaleInterpEndFrame = this.frame + 1;
             this.scaleEnd = scale;
         } else {
             this.scaleInterpStartFrame = this.frame;
-            this.scaleInterpEndFrame = this.frame + 12;
+            this.scaleInterpEndFrame = this.frame + 1;
             this.scaleStart = this.scale;
             this.scaleEnd = scale;
             this.interpScale = true;
@@ -279,7 +256,7 @@ class Renderer {
     }
 
     untransformCoords(x, y) {
-        return mulMatrix(invertMatrix3x3(transformToMatrix(this.cameraTransform)), [[x], [y], [1]]);
+        return screenToWorld([x, y], this.cameraTransform);
     }
 
 }
@@ -348,11 +325,7 @@ class Input {
         let fac = event.deltaY > 0 ? -1 : 1;
         this.scrollLevel += fac;
 
-        let worldc = this.renderer.untransformCoords(this.mouseX, this.mouseY);
-        let wx = worldc[0][0];
-        let wy = worldc[1][0];
-        
-        this.renderer.setScale(wx, wy, Math.pow(1.3, this.scrollLevel));
+        this.renderer.setScale(this.mouseX, this.mouseY, Math.pow(1.2, this.scrollLevel));
 
     }
 
@@ -374,9 +347,8 @@ class Input {
         
         this.mouseMoved = true;
 
-        let box = this.canvas.getBoundingClientRect();
-        this.mouseX = event.clientX - box.left;
-        this.mouseY = event.clientY - box.top;
+        this.mouseX = event.offsetX;
+        this.mouseY = event.offsetY;
 
         // Drag
         if(this.mouseDown) {
@@ -385,29 +357,21 @@ class Input {
         }
 
         if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS) {
-            let worldc = this.renderer.untransformCoords(this.mouseX, this.mouseY);
-            let wx = worldc[0][0];
-            let wy = worldc[1][0];
-            let wc = [wx, wy];
-            this.worldCoords = wc;
+            this.worldCoords = this.renderer.untransformCoords(this.mouseX, this.mouseY);;
         }
 
     }
 
     handleClick(event) {
 
-        let worldc = this.renderer.untransformCoords(this.mouseX, this.mouseY);
-        let wx = worldc[0][0];
-        let wy = worldc[1][0];
-        let wc = [wx, wy];
-        this.worldCoords = wc;
+        this.worldCoords = this.renderer.untransformCoords(this.mouseX, this.mouseY);;
 
         if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS) {
     
             if(this.points.length == 0) {
-                this.points.push(wc);
-            } else if(this.game.world.clearPath(this.points[0], wc)) {
-                this.points.push(wc);
+                this.points.push(this.worldCoords);
+            } else if(this.game.world.hasClearPath(this.points[0], this.worldCoords)) {
+                this.points.push(this.worldCoords);
             }
 
             if(this.points.length == 2) {
