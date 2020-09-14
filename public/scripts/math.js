@@ -33,23 +33,3 @@ const interpQuadratic = function(x1, x2, y1, y2, t) {
 const inRange = function(val, v1, v2) {
     return val > Math.min(v1, v2) && val < Math.max(v1, v2);
 };
-
-// From StackOverflow:
-// https://stackoverflow.com/questions/9043805/test-if-two-lines-intersect-javascript-function
-const intersectsComponent = function(a, b, c, d, p, q, r, s) {
-    let det, gamma, lambda;
-    det = (c - a) * (s - q) - (r - p) * (d - b);
-
-    if (det === 0) {
-        return false;
-    } else {
-        lambda = ((s - q) * (r - a) + (p - r) * (s - b)) / det;
-        gamma = ((b - d) * (r - a) + (c - a) * (s - b)) / det;
-        return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1);
-    }
-  };
-
-// Line segment intersection
-const intersects = function(a1, a2, b1, b2) {
-    return intersectsComponent(a1[0], a1[1], a2[0], a2[1], b1[0], b1[1], b2[0], b2[1]);
-}

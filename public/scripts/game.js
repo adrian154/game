@@ -22,7 +22,30 @@ Object.freeze(InputTasks);
 
 // Note to self on rendering:
 // Top level rendering functions call lower level rendering functions
-// Bottom  level rendering functions are responsible for saving and restoring canvas state
+// Bottom level rendering functions are responsible for saving and restoring canvas state
+
+class Soldier {
+
+    constructor(object) {
+        this.x = object.x;
+        this.y = object.y;
+        this.id = object.id;
+    }
+
+    update(object) {
+        this.x = object.x;
+        this.y = object.y;
+    }
+
+    render(ctx) {
+        ctx.save();
+        ctx.fillStyle = "#ffff00";
+        ctx.translate(this.x, this.y);
+        ctx.fillRect(-5, -5, 10, 10);
+        ctx.restore();
+    }
+
+}
 
 class World {
 
@@ -68,7 +91,7 @@ class World {
     
     }
 
-    // Apply an update from the server
+    // Apply a tile update from the server
     applyUpdate(update) {
         // TODO
     }
@@ -89,8 +112,18 @@ class World {
         ctx.restore();
     }
 
-    renderObjects(ctx) {
+    addObject(object) {
+        let classes = {
+            "soldier": Soldier
+        };
 
+        this.objects.push(new classes[object.type](object));
+    }
+
+    renderObjects(ctx) {
+        for(let object of this.objects) {
+            object.render(ctx);
+        }
     }
 
 }
@@ -455,6 +488,10 @@ class Game {
         // Set up world
         this.world = new World(message.mapData);
 
+        for(let object of message.objects) {
+            this.world.addObject(object);
+        }
+
         // Remove name pick fields
         this.pickNameInput.remove();
         this.pickNameButton.remove();
@@ -465,17 +502,12 @@ class Game {
     }
 
     handleAddObject(message) {
-        
-        // convert JSON object to real object
-        let transformers = {
-
-        };
-
-        this.world.objects.push(transformers[message.object.type](message.object));
-
+        this.world.addObject(message.object);
     }
 
     handleUpdateWorld(message) {
+
+        // ... dispatch world's update method
 
     }
 
@@ -486,6 +518,7 @@ class Game {
     handleMessage(event) {
 
         let message = JSON.parse(event.data);
+        console.log(message);
         
         // Dispatch appropriate handler
         ({

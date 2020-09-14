@@ -50,8 +50,16 @@ class GameServer {
         // game data
         this.map = new Map(map);
         this.players = [];
+        this.soldiers = [];
         this.nextPlayerID = 0;
-        
+        this.nextObjectID = 0;
+
+    }
+
+    getAllObjects() {
+
+        return this.soldiers;
+
     }
 
     handleJoinGame(message, socket) {
@@ -69,10 +77,40 @@ class GameServer {
         // Send gamestart
         socket.send(JSON.stringify({
             type: "gameStart",
-            mapData: this.map.data
+            mapData: this.map.data,
+            objects: this.getAllObjects()
         }));
 
         this.broadcastUpdatePlayerList();
+
+    }
+
+    handlePlaceSwarm(message) {
+
+        let soldier = {
+            type: "soldier",
+            x: message.x,
+            y: message.y,
+            id: this.nextObjectID
+        };
+
+
+        this.soldiers.push(soldier);
+        this.broadcastObjectCreation(soldier);
+        this.nextObjectID++;
+
+    }
+
+    broadcastObjectCreation(object) {
+
+        let text = JSON.stringify({
+            type: "addObject",
+            object: object
+        });
+
+        for(let player of this.players) {
+            player.socket.send(text);
+        }
 
     }
 
@@ -96,7 +134,8 @@ class GameServer {
 
         // Dispatch handler
         let handlers = {
-            joinGame: message => this.handleJoinGame(message, socket)
+            joinGame: message => this.handleJoinGame(message, socket),
+            placeSwarm: message => this.handlePlaceSwarm(message, socket)
         };
 
         if(handlers.hasOwnProperty(message.type)) {
