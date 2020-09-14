@@ -250,6 +250,7 @@ class GameServer {
             objects: this.map.objects
         }));
 
+        this.broadcastChatMessage(`Player ${player.name} joined the game`);
         this.broadcastUpdatePlayerList();
 
     }
@@ -276,7 +277,8 @@ class GameServer {
         // Dispatch handler
         let handlers = {
             joinGame: message => this.handleJoinGame(message, socket),
-            placeSwarm: message => this.map.handlePlaceSwarm(message, socket)
+            placeSwarm: message => this.map.handlePlaceSwarm(message, socket),
+            chatMessage: message => this.handleChatMessage(message, socket)
         };
 
         if(handlers.hasOwnProperty(message.type)) {
@@ -291,12 +293,28 @@ class GameServer {
 
     }
 
+    handleChatMessage(message, socket) {
+        this.broadcastChatMessage(`${socket.player.name}: ${message.message}`);
+    }
+
+    broadcastChatMessage(message) {
+        let text = JSON.stringify({
+            type: "chatMessage",
+            text: message
+        })
+    
+        for(let player of this.players) {
+            player.socket.send(text);
+        }
+    }
+
     handleSocketClose(code, reason, socket) {
 
         // Remove player from list
         let index = this.players.findIndex(player => player.id === socket.player.id);
         this.players.splice(index, 1);
         this.broadcastUpdatePlayerList();
+        this.broadcastChatMessage(`Player ${socket.player.name} left the game`);
 
     }
     
@@ -309,6 +327,8 @@ class GameServer {
     }
 
     handleClose() {
+
+        // This is for the SERVER closing, not a user's socket.
 
     }
 

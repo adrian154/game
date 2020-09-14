@@ -11,6 +11,7 @@
             <div id="navbar">
                 <button onclick="showTab('gameTab', this)" class="active">Game</button>
                 <button onclick="showTab('infoTab', this)">Info</button>
+                <button onclick="showTab('chatTab', this)">Chat</button>
             </div>
             <div id="gameTab" class="tab">
                 <p id="playerList"></p>
@@ -23,6 +24,10 @@
                 <p>Adrian Zhang - Programming</p>
                 <p>This project is open source. Check out the <a href="https://github.com/adrian154/game">GitHub repo</a>.</p>
                 <p>&copy; 2020 Adrian Zhang</p>
+            </div>
+            <div id="chatTab" class="tab" style="display: none">
+                <input type="text" id="chatMessage"><button onclick="sendMessage()">Send</button>
+                <textarea id="chatArea" disabled></textarea>
             </div>
         </div>
         
@@ -38,6 +43,8 @@
         <script>
             let previousTab = null;
             
+            const chatMessageField = document.getElementById("chatMessage");
+
             const showTab = function(which, button) {
 
                 if(button !== undefined) {
@@ -57,6 +64,19 @@
                 }
 
             }
+
+            const sendMessage = function() {
+                game.socket.send(JSON.stringify({
+                    type: "chatMessage",
+                    message: chatMessageField.value
+                }));
+                chatMessageField.value = "";
+            };
+
+            chatMessageField.addEventListener("keydown", (event) => {
+                if(event.key === "Enter")
+                    sendMessage();
+            });
 
             showTab("gameTab");
         </script>

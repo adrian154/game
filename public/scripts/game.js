@@ -529,6 +529,10 @@ class Game {
         document.getElementById("playerList").innerHTML = "Players: " + message.players.join(", ");
     }
 
+    handleChatMessage(message) {
+        document.getElementById("chatArea").value += message.text + "\n";
+    }
+
     handleMessage(event) {
 
         let message = JSON.parse(event.data);
@@ -539,7 +543,8 @@ class Game {
             "addObject": message => this.handleAddObject(message),
             "updatePlayerList": message => this.handleUpdatePlayerList(message),
             "updateWorld": message => this.handleUpdateWorld(message),
-            "updateObjects": message => this.handleUpdateObjects(message)
+            "updateObjects": message => this.handleUpdateObjects(message),
+            "chatMessage": message => this.handleChatMessage(message)
         })[message.type](message);
 
     }
