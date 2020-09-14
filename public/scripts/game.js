@@ -209,9 +209,12 @@ class Renderer {
 
     renderUI() {
 
+
         let curTask = Object.keys(InputTasks).find(key => InputTasks[key] === this.game.input.currentTask);
         this.ctx.textAlign = "left";
-        this.ctx.fillText(`Active input task: ${curTask}`, 0, 24);
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.font = "24px Monospace";
+        this.ctx.fillText(`Active input task: ${curTask}`, 10, 24);
 
     }
 
