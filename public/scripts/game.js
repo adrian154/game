@@ -12,7 +12,8 @@ const GameStates = {
 };
 
 const InputTasks = {
-    NONE: 0
+    NONE: 0,
+    PLACING_SWARM: 1
 };
 
 Object.freeze(Tiles);
@@ -157,7 +158,9 @@ class Renderer {
 
     renderUI() {
 
-        // Nothing to see here for now
+        let curTask = Object.keys(InputTasks).find(key => InputTasks[key] === this.game.input.currentTask);
+        this.ctx.textAlign = "left";
+        this.ctx.fillText(`Active input task: ${curTask}`, 0, 24);
 
     }
 
@@ -290,6 +293,19 @@ class Input {
 
     }
 
+    addGameUI() {
+
+        let tab = document.getElementById("gameTab");
+
+        this.placeSwarmButton = document.createElement("button");
+        this.placeSwarmButton.classList.add(".action");
+        this.placeSwarmButton.appendChild(document.createTextNode("Place Swarm"));
+        this.placeSwarmButton.addEventListener("click", () => this.currentTask = InputTasks.PLACING_SWARM);
+
+        tab.appendChild(this.placeSwarmButton);
+        
+    }
+
     handleKey(event, state) {
 
         // Don't listen to repeat events
@@ -299,11 +315,7 @@ class Input {
             this.ctrlHeld = state;
         }
     }
-
-    handleButtonClick(event, which) {
-
-    }
-
+    
     handleScroll(event) {
         
         let fac = event.deltaY > 0 ? -1 : 1;
@@ -355,7 +367,12 @@ class Input {
 
     handleClick(event) {
 
-        this.worldCoords = this.renderer.untransformCoords(this.mouseX, this.mouseY);;
+        let worldCoords = this.renderer.untransformCoords(event.offsetX, event.offsetY);
+        
+        if(this.currentTask === InputTasks.PLACING_SWARM) {
+            this.game.remote.placeSwarm(worldCoords[0], worldCoords[1]);
+            this.currentTask = InputTasks.NONE;
+        }
 
     }
 
@@ -365,6 +382,14 @@ class Remote {
 
     constructor(socket) {
         this.socket = socket;
+    }
+
+    placeSwarm(x, y) {
+        this.socket.send(JSON.stringify({
+            type: "placeSwarm",
+            x: x,
+            y: y
+        }));
     }
 
 }
@@ -433,6 +458,9 @@ class Game {
         // Remove name pick fields
         this.pickNameInput.remove();
         this.pickNameButton.remove();
+
+        // Add UI
+        this.input.addGameUI();
 
     }
 

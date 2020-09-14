@@ -111,16 +111,24 @@ class GameServer {
 
     }
 
+    handleSocketClose(code, reason, socket) {
+
+        // Remove player from list
+        let index = this.players.findIndex(player => player.id === socket.player.id);
+        this.players.splice(index, 1);
+        this.broadcastUpdatePlayerList();
+
+    }
+    
     handleConnection(socket) {
         
         // Set up socket handlers
         socket.on("message", message => this.handleMessage(message, socket));
+        socket.on("close", (code, reason) => this.handleSocketClose(code, reason, socket));
 
     }
 
     handleClose() {
-        
-
 
     }
 
