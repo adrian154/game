@@ -6,12 +6,22 @@
         <title>Game</title>
     </head>
     <body>
+        
         <div id="sidebar">
-            <button id="putRoadButton">Place Road</button>
+            <p><b>Controls</b></p>
+            <p>Hold down left-click to pan, and use the scroll wheel to zoom. Hold CTRL to rotate.</p>
+            <p></p>
         </div>
+        
         <div id="gameArea">
             <canvas id="gameCanvas"></canvas>
         </div>
+        
+        <!-- Offscreen canvas for world rendering -->
+        <div style="display: none">
+            <canvas id="worldCanvas"></canvas>
+        </div>
+
         <script type="text/javascript" src="scripts/math.js"></script>
         <script type="text/javascript" src="scripts/game.js"></script>
     </body>
