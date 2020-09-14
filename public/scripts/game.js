@@ -41,7 +41,7 @@ class Soldier {
         ctx.save();
         ctx.fillStyle = "#ffff00";
         ctx.translate(this.x, this.y);
-        ctx.fillRect(-5, -5, 10, 10);
+        ctx.fillRect(-2, -2, 4, 4);
         ctx.restore();
     }
 

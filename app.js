@@ -6,6 +6,11 @@ const WebSocket = require("ws");
 
 const map = require("./map.json");
 
+// Utility funcs
+const rectContains = function(width, height, x, y) {
+    return x >= 0 && y >= 0 && x < width && y < height;
+}
+
 class App {
 
     constructor(options) {
@@ -27,10 +32,131 @@ class App {
 
 }
 
-class Map {
+class World {
 
-    constructor(data) {
+    constructor(data, game) {
         this.data = data;
+        this.game = game;
+        this.objects = [];
+        this.nextObjectID = 0;
+    }
+
+    // It's assumed that the map is rectangular
+    inside(x, y) {
+        return x >= 0 &&  y >= 0 && x < this.data.length && y < this.data[0].length;
+    }
+
+    addSoldier(x, y) {
+        let soldier = {
+            type: "soldier",
+            x: message.x,
+            y: message.y,
+            id: this.nextObjectID
+        };
+
+        this.objects.push(soldier);
+        this.broadcastObjectCreation(soldier);
+        this.nextObjectID++;
+    }
+
+    // Add an object based on a message payload
+    handlePlaceSwarm(message, socket) {
+        
+
+    }
+
+    broadcastObjectCreation(object) {
+
+        let text = JSON.stringify({
+            type: "addObject",
+            object: object
+        });
+
+        for(let player of this.game.players) {
+            player.socket.send(text);
+        }
+
+    }
+
+    calculateNavGrid() {
+
+        let width = map.length / 4;
+        let height = map[0].length / 4;
+
+        let grid = new Array(width);
+        for(let i = 0; i < grid.length; i++) {
+            grid[i] = new Array(height);
+            for(let j = 0; j < grid[i].length; j++) {
+                grid[i][j] = Infinity;
+            }
+        }
+
+        // do what amounts to a breadth first search
+        // this code is really bad
+        // it's very GC intensive and also has awful time complexity
+        // but whatever
+        let front = [[32, 32]];
+        let steps = 0;
+
+        while(front.length > 0) {
+
+            let next = [];
+            for(let elem of front) {
+
+                let x = elem[0];
+                let y = elem[1];
+                grid[x][y] = steps;
+
+                for(let dx = -1; dx <= 1; dx++) {
+                    for(let dy = -1; dy <= 1; dy++) {
+
+                        // Avoid center or corners
+                        if(dx == dy) continue;
+                        if(!rectContains(width, height, x + dx, y + dy)) continue;
+
+                        // If the front has not touched this tile already...
+                        if(grid[x + dx][y + dy] === Infinity) {
+                        
+                            // Make sure this element is not already on the front
+                            if(next.find(elem => elem[0] == x + dx && elem[1] == y + dy) === undefined) {
+                                next.push([x + dx, y + dy]);
+                            }
+
+                        }
+
+                    }
+                }
+
+            }
+
+            front = next;
+
+            steps++;
+
+        }
+
+        // convert distance grid to vectors
+        let vectorGrid = new Array(width);
+        for(let i = 0; i < vectorGrid.length; i++) {
+            vectorGrid[i] = new Array(height);
+            for(let j = 0; j < vectorGrid[i].length; j++) {
+
+                let left = i - 1 >= 0 ? grid[i - 1][j] : 0;
+                let right = i + 1 < grid.length ? grid[i + 1][j] : 0;
+                let bottom = j - 1 >= 0 ? grid[i][j - 1] : 0;
+                let top = j + 1 < grid[i].length ? grid[i][j + 1] : 0;
+
+                let length = Math.sqrt((right - left) * (right - left) + (top - bottom) * (top - bottom));
+
+                vectorGrid[i][j] = [
+                    (right - left) / length,
+                    (top - bottom) / length
+                ];
+            }
+        }
+
+        return vectorGrid;
+
     }
 
 }
@@ -48,17 +174,9 @@ class GameServer {
         this.wsServ.on("close", () => this.handleClose());
 
         // game data
-        this.map = new Map(map);
+        this.map = new World(map, this);
         this.players = [];
-        this.soldiers = [];
         this.nextPlayerID = 0;
-        this.nextObjectID = 0;
-
-    }
-
-    getAllObjects() {
-
-        return this.soldiers;
 
     }
 
@@ -78,45 +196,17 @@ class GameServer {
         socket.send(JSON.stringify({
             type: "gameStart",
             mapData: this.map.data,
-            objects: this.getAllObjects()
+            objects: this.map.objects
         }));
 
         this.broadcastUpdatePlayerList();
 
     }
 
-    handlePlaceSwarm(message) {
-
-        let soldier = {
-            type: "soldier",
-            x: message.x,
-            y: message.y,
-            id: this.nextObjectID
-        };
-
-
-        this.soldiers.push(soldier);
-        this.broadcastObjectCreation(soldier);
-        this.nextObjectID++;
-
-    }
-
-    broadcastObjectCreation(object) {
-
-        let text = JSON.stringify({
-            type: "addObject",
-            object: object
-        });
-
-        for(let player of this.players) {
-            player.socket.send(text);
-        }
-
-    }
-
     broadcastUpdatePlayerList() {
         
-        // Don't send more info than we need to.
+        // Don't send more info than we need to
+        // This avoids leaking IPs
         let text = JSON.stringify({
             type: "updatePlayerList",
             players: this.players.map(player => player.name)
@@ -128,14 +218,14 @@ class GameServer {
 
     }
 
-    handleMessage(message, socket) {   
+    handleMessage(message, socket) {
         
         message = JSON.parse(message);
 
         // Dispatch handler
         let handlers = {
             joinGame: message => this.handleJoinGame(message, socket),
-            placeSwarm: message => this.handlePlaceSwarm(message, socket)
+            placeSwarm: message => this.map.handlePlaceSwarm(message, socket)
         };
 
         if(handlers.hasOwnProperty(message.type)) {
