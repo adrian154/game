@@ -47,11 +47,25 @@ class GameServer {
         this.wsServ.on("connection", socket => this.handleConnection(socket));
         this.wsServ.on("close", () => this.handleClose());
 
+        // game data
         this.map = new Map(map);
-
+        this.players = [];
+        this.nextPlayerID = 0;
+        
     }
 
-    handleJoinGame(message) {
+    handleJoinGame(message, socket) {
+
+        let player = {
+            name: message.name,
+            id: this.nextPlayerID
+        };
+
+        this.players.push(player);
+        this.nextPlayerID++;
+        socket.player = player;
+
+        console.log(this.players);
 
         // Send gamestart
         socket.send(JSON.stringify({
@@ -67,11 +81,15 @@ class GameServer {
 
         // Dispatch handler
         let handlers = {
-            joinGame: message => this.handleJoinGame(message)
+            joinGame: message => this.handleJoinGame(message, socket)
         };
 
         if(handlers.hasOwnProperty(message.type)) {
-            (handlers[message.type])(message);
+            try {
+                handlers[message.type](message);
+            } catch(error) {
+                console.log(`Error while handling message: ${error}`);
+            }
         } else {
             console.log(`WARNING: Unknown message type ${message.type}, ignoring`);
         }

@@ -11,14 +11,13 @@ const GameStates = {
     SOCKET_CLOSED: 3
 };
 
-const InputTask = {
-    NONE: 0, // Just scrolling, etc.
-    PLACING_TWO_ENDPOINTS: 1 // Selecting two endpoints
+const InputTasks = {
+    NONE: 0
 };
 
 Object.freeze(Tiles);
 Object.freeze(GameStates);
-Object.freeze(InputTask);
+Object.freeze(InputTasks);
 
 // Note to self on rendering:
 // Top level rendering functions call lower level rendering functions
@@ -270,7 +269,7 @@ class Input {
         this.mouseX = 0; // screen
         this.mouseY = 0; // screen
 
-        this.currentTask = InputTask.NONE;
+        this.currentTask = InputTasks.NONE;
         this.ctrlHeld = false; // ctrl toggles rotation mode
 
         // Add event listeners..
@@ -281,7 +280,6 @@ class Input {
         this.canvas.addEventListener("mousemove", event => this.handleMouseMove(event));
 
         // ..on buttons
-        //document.getElementById("putRoadButton").addEventListener("click", event => this.handleButtonClick(event, "wall"));
 
         // ..on document
         document.addEventListener("wheel", event => this.handleScroll(event));
@@ -300,19 +298,9 @@ class Input {
         if(event.key === "Control") {
             this.ctrlHeld = state;
         }
-
-        if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS && event.key === "escape") {
-            this.currentTask = InputTask.NONE;
-        }
-
     }
 
     handleButtonClick(event, which) {
-
-        if(which === "wall") {
-            this.currentTask = InputTask.PLACING_TWO_ENDPOINTS;
-            this.points = [];
-        }
 
     }
 
@@ -361,10 +349,6 @@ class Input {
             }
         }
 
-        if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS) {
-            this.worldCoords = this.renderer.untransformCoords(this.mouseX, this.mouseY);;
-        }
-
         event.preventDefault();
 
     }
@@ -372,40 +356,6 @@ class Input {
     handleClick(event) {
 
         this.worldCoords = this.renderer.untransformCoords(this.mouseX, this.mouseY);;
-
-        if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS) {
-    
-            if(this.points.length == 0) {
-                this.points.push(this.worldCoords);
-            } else if(this.game.world.hasClearPath(this.points[0], this.worldCoords)) {
-                this.points.push(this.worldCoords);
-            }
-
-            if(this.points.length == 2) {
-                this.currentTask = InputTask.NONE;
-                game.remote.sendPlaceWall(this.points);
-            }
-
-        }
-
-    }
-
-    // Draw preview for stuff
-    renderPreview(ctx) {
-
-        ctx.globalAlpha = 0.5;
-
-        if(this.currentTask == InputTask.PLACING_TWO_ENDPOINTS) {
-
-            if(this.points.length == 1) {
-                let previewObj = new Wall(this.points[0],  this.worldCoords);
-                console.log(this.points[0], this.worldCoords);
-                previewObj.render(ctx);
-            }
-
-        }
-
-        ctx.globalAlpha = 1.0;
 
     }
 
@@ -415,13 +365,6 @@ class Remote {
 
     constructor(socket) {
         this.socket = socket;
-    }
-
-    sendPlaceWall(points) {
-        this.socket.send(JSON.stringify({
-            type: "placeWall",
-            points: points
-        }));
     }
 
 }
@@ -455,7 +398,28 @@ class Game {
 
         this.state = GameStates.AWAITING_GAME_START;
 
-        // Create pick name button...
+        // Create pick-name fields
+        let tab = document.getElementById("gameTab");
+        
+        this.pickNameInput = document.createElement("input");
+        this.pickNameInput.placeholder = "Choose a name...";
+        
+        this.pickNameButton = document.createElement("button");
+        this.pickNameButton.value = "Join";
+        
+        // Dirty closure code
+        let socket = this.socket;
+        let namePicker = this.pickNameInput;
+
+        this.pickNameButton.addEventListener("click", function() {
+            socket.send(JSON.stringify({
+                type: "joinGame",
+                name: namePicker.value
+            }));
+        });
+
+        tab.appendChild(this.pickNameInput);
+        tab.appendChild(this.pickNameButton);
 
     }
 
@@ -465,6 +429,10 @@ class Game {
         
         // Set up world
         this.world = new World(message.mapData);
+
+        // Remove name pick fields
+        this.pickNameInput.remove();
+        this.pickNameButton.remove();
 
     }
 
