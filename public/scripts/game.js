@@ -126,6 +126,24 @@ class World {
         }
     }
 
+    updateObjects(objects) {
+        
+        // Awful O(N^2) 
+        for(let object of objects) {
+
+            // Find element in objects
+            for(let localObject of this.objects) {
+                if(localObject.id === object.id) {
+                    for(let [key, value] of Object.entries(object)) {
+                        localObject[key] = value;
+                    }
+                }
+            }
+
+        }
+
+    }
+
 }
 
 // This class is having a bit of an identity crisis
@@ -197,13 +215,6 @@ class Renderer {
 
     }
 
-    // Remove once project is stable
-    drawDebugNub() {
-        let wc = this.untransformCoords(this.game.input.mouseX, this.game.input.mouseY);
-        this.ctx.fillStyle = "#ff0000";
-        this.ctx.fillRect(wc[0], wc[1], 5, 5);
-    }
-
     render() {
 
         if(this.game.state === GameStates.GAME_RUNNING) {
@@ -253,10 +264,6 @@ class Renderer {
         // draw objects
         this.ctx.setTransform(this.cameraTransform);
         this.game.world.renderObjects(this.ctx);
-
-        // draw debug nub
-        this.ctx.setTransform(this.cameraTransform);
-        this.drawDebugNub();
 
         // draw UI
         this.ctx.resetTransform();
@@ -511,6 +518,10 @@ class Game {
 
     }
 
+    handleUpdateObjects(message) {  
+        this.world.updateObjects(message.objects);
+    }
+
     handleUpdatePlayerList(message) {
         document.getElementById("playerList").innerHTML = "Players: " + message.players.join(", ");
     }
@@ -518,14 +529,14 @@ class Game {
     handleMessage(event) {
 
         let message = JSON.parse(event.data);
-        console.log(message);
         
         // Dispatch appropriate handler
         ({
             "gameStart": message => this.handleGameStart(message),
             "addObject": message => this.handleAddObject(message),
             "updatePlayerList": message => this.handleUpdatePlayerList(message),
-            "updateWorld": message => this.handleUpdateWorld(message)
+            "updateWorld": message => this.handleUpdateWorld(message),
+            "updateObjects": message => this.handleUpdateObjects(message)
         })[message.type](message);
 
     }

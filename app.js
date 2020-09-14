@@ -36,21 +36,31 @@ class World {
 
     constructor(data, game) {
         this.data = data;
+        this.width = data.length;
+        this.height = data[0].length;
         this.game = game;
         this.objects = [];
         this.nextObjectID = 0;
+
+        this.navgrid = this.calculateNavGrid();
+        setInterval(() => this.update(), 50);
     }
 
     // It's assumed that the map is rectangular
+    // Check if indices are inside map
     inside(x, y) {
         return x >= 0 &&  y >= 0 && x < this.data.length && y < this.data[0].length;
+    }
+
+    contains(x, y) {
+        return x > -this.width / 2 && y > -this.height / 2 && x < this.width / 2 && y < this.height / 2;
     }
 
     addSoldier(x, y) {
         let soldier = {
             type: "soldier",
-            x: message.x,
-            y: message.y,
+            x: x,
+            y: y,
             id: this.nextObjectID
         };
 
@@ -61,7 +71,13 @@ class World {
 
     // Add an object based on a message payload
     handlePlaceSwarm(message, socket) {
-        
+
+        // Add tons of soldiers
+        for(let i = 0; i < 10; i++) {
+            let angle = Math.random() * 2 * Math.PI;
+            let dist = Math.random()  * 20;
+            this.addSoldier(message.x + Math.cos(angle) * dist, message.y + Math.sin(angle) * dist);
+        }
 
     }
 
@@ -75,6 +91,41 @@ class World {
         for(let player of this.game.players) {
             player.socket.send(text);
         }
+
+    }
+
+    broadcastObjectUpdate(object) {
+
+        let text = JSON.stringify({
+            type: "updateObjects",
+            objects: this.objects
+        });
+
+        for(let player of this.game.players) {
+            player.socket.send(text);
+        }
+
+    }
+
+    // Move everything
+    update() {
+        
+        for(let object of this.objects) {
+
+            if(object.type === "soldier") {
+                
+                // Move according to navgrid for now
+                if(this.contains(object.x, object.y)) {
+                    let navVector = this.navgrid[Math.floor(object.x / 4 + 32)][Math.floor(object.y / 4 + 32)];
+                    object.x += navVector[0] * 2;
+                    object.y += navVector[1] * 2;
+                }
+
+            } 
+
+        }
+
+        this.broadcastObjectUpdate();
 
     }
 
@@ -149,8 +200,8 @@ class World {
                 let length = Math.sqrt((right - left) * (right - left) + (top - bottom) * (top - bottom));
 
                 vectorGrid[i][j] = [
-                    (right - left) / length,
-                    (top - bottom) / length
+                    (left - right) / length,
+                    (bottom - top) / length
                 ];
             }
         }
@@ -232,7 +283,7 @@ class GameServer {
             try {
                 handlers[message.type](message);
             } catch(error) {
-                console.error(`Error while handling message: ${error}`);
+                console.error(`Error while handling message: ${error.stack}`);
             }
         } else {
             console.log(`WARNING: Unknown message type ${message.type}, ignoring`);
