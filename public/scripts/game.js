@@ -526,7 +526,7 @@ class Game {
     }
 
     handleUpdatePlayerList(message) {
-        document.getElementById("playerList").innerHTML = "Players: " + message.players.join(", ");
+        document.getElementById("playerList").innerHTML = "<b>Players:</b> " + message.players.join(", ");
     }
 
     handleChatMessage(message) {
