@@ -4,51 +4,52 @@
         <title>Map Editor</title>
     </head>
     <body>
-        <canvas id="mainCanvas" width="512" height="512"></canvas>
+        <input type="file" id="upload">
+        <button onclick="exportMap()">Export</button>
+        <canvas id="out"></canvas>
+        <textarea placeholder="Map comes out here..." id="outtext"></textarea>
+        <image id="preview" src="#" style="visibility: hidden"></image>
         <script>
-            const canvas = document.getElementById("mainCanvas");
+            const canvas = document.getElementById("out");
             const ctx = canvas.getContext("2d");
-            ctx.translate(canvas.width / 2, canvas.height / 2)
 
-            let map = [[]];
+            let image;
+            let loaded = false;
 
-            const draw = function() {
-                
-                ctx.fillStyle = "#aaaaaa";
-                ctx.fillRect(-canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
-
-                for(let elem of map) {
-
-                    if(elem.length == 0) continue;
-
-                    ctx.fillStyle = "#000000";
-                    ctx.beginPath();
-                    ctx.moveTo(elem[0][0], elem[0][1]);
-                    for(let i = 1; i < elem.length; i++) {
-                        ctx.lineTo(elem[i][0], elem[i][1]);
-                    }
-                    ctx.closePath();
-                    ctx.fill();
+            document.getElementById("upload").addEventListener("change", function() {
+                if(this.files && this.files[0]) {
+                    image = document.getElementById("preview");
+                    image.src = URL.createObjectURL(this.files[0]);
+                    image.onload = function() {
+                        loaded = true;
+                        load();
+                    };
                 }
+            });
 
-                requestAnimationFrame(draw);
+            const load = function() {
+                canvas.width = image.width;
+                canvas.height = image.height;
+                ctx.drawImage(image, 0, 0);
             };
 
-            draw();
-
-            canvas.addEventListener("click", event => {
-                let box = canvas.getBoundingClientRect();
-                let x = event.clientX - box.left;
-                let y = event.clientY - box.top;
-                map[map.length - 1].push([x - canvas.width / 2, y - canvas.height / 2]);
-            });
-            
-            window.addEventListener("keydown", event => {
-                if(event.key === "f") {
-                    map.push([]);
+            const exportMap = function() {
+                if(loaded) {
+                    let imgdata = ctx.getImageData(0, 0, image.width, image.height);
+                    let map = new Array(image.width);
+                    for(let i = 0; i < map.length; i++) {
+                        map[i] = new Array(image.height);
+                        for(let j = 0; j < map[i].length; j++) {
+                            let idx = (j * image.width + i) * 4;
+                            let r = imgdata.data[idx];
+                            let g = imgdata.data[idx + 1];
+                            let b = imgdata.data[idx + 2];
+                            map[i][j] = r === 0 ? 1 : 0;
+                        }
+                    }
+                    document.getElementById("outtext").value = JSON.stringify(map);
                 }
-            });
-
+            };
         </script>
     </body>
 </html>
