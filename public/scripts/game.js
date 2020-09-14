@@ -186,7 +186,8 @@ class Renderer {
                 default: text = "something extremely bad happened"; break;
             }
 
-            this.ctx.fillText(text, this.ctx.canvas.width / 2, this.ctx.canvas.height / 2)
+            this.ctx.fillText(text, this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+            this.ctx.fillText("if this is unexpected, reload the page", this.ctx.canvas.width / 2, this.canvas.height / 2 + 24);
         
         }
 

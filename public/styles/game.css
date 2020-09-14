@@ -19,9 +19,9 @@ body {
 
 #sidebar {
     flex-basis: 20%;
-    background-color: #333333;
+    background-color: #222222;
     color: #ffffff;
-    padding: 1.0em;
+    padding: 0;
     height: 100%;
 }
 
@@ -30,6 +30,10 @@ body {
     border-radius: 5px;
     padding: 1.0em;
     font-size: 1.0em;
+}
+
+#sidebar a, a:visited {
+    color: #8fd0ff
 }
 
 #gameArea {
@@ -44,4 +48,36 @@ body {
 
 #worldCanvas {
     image-rendering: pixelated;
+}
+
+.tab {
+    padding: 1.0em;
+    overflow: hidden;
+    display: none;
+    background-color: #333333;
+    height: 100%;
+}
+
+#navbar {
+    overflow: hidden;
+}
+
+#navbar button {
+    float: left;
+    border: none;
+    border-radius: 0;
+    outline: none;
+    cursor: pointer;
+    padding: 1.0em;
+    background-color: inherit;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+#navbar .active {
+    background-color: #333333;
+}
+
+#navbar button:hover {
+    background-color: #555555;
 }

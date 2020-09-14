@@ -8,9 +8,22 @@
     <body>
         
         <div id="sidebar">
-            <p><b>Controls</b></p>
-            <p>Hold down left-click to pan, and use the scroll wheel to zoom. Hold CTRL to rotate.</p>
-            <p></p>
+            <div id="navbar">
+                <button onclick="showTab('gameTab', this)" class="active">Game</button>
+                <button onclick="showTab('infoTab', this)">Info</button>
+            </div>
+            <div id="gameTab" class="tab">
+                <p>game stuff goes here</p>
+            </div>
+            <div id="infoTab" class="tab" style="display: none">
+                <p><b>Controls</b></p>
+                <p>Hold down left-click to pan, and use the scroll wheel to zoom. Hold CTRL to rotate.</p>
+
+                <p><b>Credits</b></p>
+                <p>Adrian Zhang - Programming</p>
+                <p>This project is open source. Check out the <a href="https://github.com/adrian154/game">GitHub repo</a>.</p>
+                <p>&copy; 2020 Adrian Zhang</p>
+            </div>
         </div>
         
         <div id="gameArea">
@@ -22,6 +35,31 @@
             <canvas id="worldCanvas"></canvas>
         </div>
 
+        <script>
+            let previousTab = null;
+            
+            const showTab = function(which, button) {
+
+                if(button !== undefined) {
+                    for(let elem of document.getElementById("navbar").querySelectorAll(".active"))
+                        elem.classList.remove("active");
+                    button.classList.add("active");
+                }
+
+                let currentTab = document.getElementById(which);
+                
+                if(currentTab !== previousTab) {
+                    currentTab.style.display = "block";
+                    if(previousTab !== null) {
+                        previousTab.style.display = "none";
+                    }
+                    previousTab = currentTab;
+                }
+
+            }
+
+            showTab("gameTab");
+        </script>
         <script type="text/javascript" src="scripts/math.js"></script>
         <script type="text/javascript" src="scripts/game.js"></script>
     </body>
