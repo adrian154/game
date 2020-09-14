@@ -58,20 +58,35 @@ class GameServer {
 
         let player = {
             name: message.name,
-            id: this.nextPlayerID
+            id: this.nextPlayerID,
+            socket: socket
         };
 
         this.players.push(player);
         this.nextPlayerID++;
         socket.player = player;
 
-        console.log(this.players);
-
         // Send gamestart
         socket.send(JSON.stringify({
             type: "gameStart",
             mapData: this.map.data
         }));
+
+        this.broadcastUpdatePlayerList();
+
+    }
+
+    broadcastUpdatePlayerList() {
+        
+        // Don't send more info than we need to.
+        let text = JSON.stringify({
+            type: "updatePlayerList",
+            players: this.players.map(player => player.name)
+        });
+
+        for(let player of this.players) {
+            player.socket.send(text);
+        }
 
     }
 
@@ -88,7 +103,7 @@ class GameServer {
             try {
                 handlers[message.type](message);
             } catch(error) {
-                console.log(`Error while handling message: ${error}`);
+                console.error(`Error while handling message: ${error}`);
             }
         } else {
             console.log(`WARNING: Unknown message type ${message.type}, ignoring`);

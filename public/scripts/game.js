@@ -405,7 +405,7 @@ class Game {
         this.pickNameInput.placeholder = "Choose a name...";
         
         this.pickNameButton = document.createElement("button");
-        this.pickNameButton.value = "Join";
+        this.pickNameButton.appendChild(document.createTextNode("Join"));
         
         // Dirty closure code
         let socket = this.socket;
@@ -440,11 +440,19 @@ class Game {
         
         // convert JSON object to real object
         let transformers = {
-            "wall": obj => new Wall(obj.point1, obj.point2),
+
         };
 
         this.world.objects.push(transformers[message.object.type](message.object));
 
+    }
+
+    handleUpdateWorld(message) {
+
+    }
+
+    handleUpdatePlayerList(message) {
+        document.getElementById("playerList").innerHTML = "Players: " + message.players.join(", ");
     }
 
     handleMessage(event) {
@@ -454,7 +462,9 @@ class Game {
         // Dispatch appropriate handler
         ({
             "gameStart": message => this.handleGameStart(message),
-            "addObject": message => this.handleAddObject(message)
+            "addObject": message => this.handleAddObject(message),
+            "updatePlayerList": message => this.handleUpdatePlayerList(message),
+            "updateWorld": message => this.handleUpdateWorld(message)
         })[message.type](message);
 
     }
