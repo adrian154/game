@@ -51,19 +51,13 @@ class GameServer {
 
     }
 
-    handlePlaceWall(message) {
+    handleJoinGame(message) {
 
-        // Assume the wall is valid.
-        for(let socket of this.wsServ.clients) {
-            socket.send(JSON.stringify({
-                type: "addObject",
-                object: {
-                    type: "wall",
-                    point1: message.points[0],
-                    point2: message.points[1]
-                }
-            }));
-        }
+        // Send gamestart
+        socket.send(JSON.stringify({
+            type: "gameStart",
+            mapData: this.map.data
+        }));
 
     }
 
@@ -73,7 +67,7 @@ class GameServer {
 
         // Dispatch handler
         let handlers = {
-            placeWall: message => this.handlePlaceWall(message)
+            joinGame: message => this.handleJoinGame(message)
         };
 
         if(handlers.hasOwnProperty(message.type)) {
@@ -88,12 +82,6 @@ class GameServer {
         
         // Set up socket handlers
         socket.on("message", message => this.handleMessage(message, socket));
-
-        // Send gamestart
-        socket.send(JSON.stringify({
-            type: "gameStart",
-            mapData: this.map.data
-        }));
 
     }
 

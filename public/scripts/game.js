@@ -40,14 +40,16 @@ class World {
         this.offscreenCanvas.height = this.height;
 
         this.drawCtx = this.offscreenCanvas.getContext("2d");
+        this.drawCtx.imageSmoothingEnabled = false;
         this.updateCanvas();
+
     
     }
 
     static getColor(tileType) {
         return ({
             [Tiles.WATER]: "#00a2e8",
-            [Tiles.GRASS]: "#22b14c"
+            [Tiles.GRASS]: "#11d44a"
         })[tileType];
     }
 
@@ -63,7 +65,7 @@ class World {
                 this.drawCtx.fillRect(x, y, 1, 1);
             }
         }
-
+    
     }
 
     // Apply an update from the server
@@ -81,7 +83,9 @@ class World {
 
     renderTerrain(ctx) {
         ctx.save();
+        ctx.imageSmoothingEnabled = false;
         ctx.drawImage(this.offscreenCanvas, -this.offscreenCanvas.width / 2, -this.offscreenCanvas.height / 2);
+        ctx.imageSmoothingEnabled = true;
         ctx.restore();
     }
 
@@ -202,7 +206,7 @@ class Renderer {
         this.ctx.resetTransform();
 
         // Backdrop
-        this.ctx.fillStyle = "#03b6fc";
+        this.ctx.fillStyle = "#00A2E8";
         this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
         // Set up camera transform
@@ -292,8 +296,6 @@ class Input {
 
         // Don't listen to repeat events
         if(event.repeat) return;
-
-        console.log(event.key, state);
 
         if(event.key === "Control") {
             this.ctrlHeld = state;
@@ -433,18 +435,27 @@ class Game {
         this.state = GameStates.AWAITING_SOCKET;
 
         // Set up websocket event listeners
-        this.socket.addEventListener("open", event => { this.state = GameStates.AWAITING_GAME_START });
+        this.socket.addEventListener("open", event => this.handleConnect());
         this.socket.addEventListener("message", event => this.handleMessage(event));
         this.socket.addEventListener("close", event => { this.state = GameStates.SOCKET_CLOSED });
 
         // Get game canvas
         this.canvas = document.getElementById("gameCanvas");
         this.ctx = this.canvas.getContext("2d");
-
+        this.ctx.imageSmoothingEnabled = false;
+        
         // Set up helper classes
         this.renderer = new Renderer(this, this.canvas);
         this.input = new Input(this, this.canvas, this.renderer);
         this.remote = new Remote(this.socket);
+
+    }
+
+    handleConnect() {
+
+        this.state = GameStates.AWAITING_GAME_START;
+
+        // Create pick name button...
 
     }
 
