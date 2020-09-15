@@ -11,7 +11,7 @@ const Tiles = {
     GRASS: 1
 };
 
-const NAVGRID_RESOLUTION = 4;
+const NAVGRID_RESOLUTION = 2;
 
 Object.freeze(Tiles);
 
@@ -127,7 +127,10 @@ class World {
                 // Move according to navgrid for now
                 if(this.contains(object.x, object.y)) {
                     let navVector = this.navgrid[Math.floor(object.x / NAVGRID_RESOLUTION + this.navgrid.length / 2)][Math.floor(object.y / NAVGRID_RESOLUTION +  + this.navgrid[0].length / 2)];
-                    if(navVector !== undefined) {
+                    
+                    // Don't use bad nav vectors
+                    if(navVector !== undefined && !(isNaN(navVector[0]) || isNaN(navVector[1]))) {
+                        console.log(navVector);
                         object.x += navVector[0] * 2;
                         object.y += navVector[1] * 2;
                     }
@@ -143,9 +146,20 @@ class World {
 
     getNavCost(tileType) {
         return ({
-            [Tiles.WATER]: Infinity,
+            [Tiles.WATER]: 100,
             [Tiles.GRASS]: 1 
         })[tileType];
+    }
+
+    // Get navigation cost of a coordinate on the nav grid
+    getNavCostAvg(x, y) {
+        let sum = 0;
+        for(let i = 0; i < NAVGRID_RESOLUTION; i++) {
+            for(let j = 0; j < NAVGRID_RESOLUTION; j++) {
+                sum += this.getNavCost(map[x * NAVGRID_RESOLUTION + i][y * NAVGRID_RESOLUTION + j]);
+            }
+        }
+        return sum / (NAVGRID_RESOLUTION * NAVGRID_RESOLUTION);
     }
 
     calculateNavGrid(x, y) {
@@ -195,8 +209,11 @@ class World {
                             if(next.find(elem => elem[0] == x + dx && elem[1] == y + dy) === undefined) {
 
                                 // Average nav cost over a grid of size N (N = navgrid resolution)
-                                grid[x + dx][y + dy] = grid[x][y] + this.getNavCost(map[(x + dx) * NAVGRID_RESOLUTION][(y + dy) * NAVGRID_RESOLUTION]);
-                                next.push([x + dx, y + dy]);
+                                let navCost = this.getNavCostAvg(x + dx, y + dy);
+                                grid[x + dx][y + dy] = grid[x][y] + navCost;
+                                console.log(`coords=(${x + dx},${y + dy}), tile=${map[(x + dx) * NAVGRID_RESOLUTION][(y + dy) * NAVGRID_RESOLUTION]}, previous=${grid[x][y]}, cost=${navCost}, new=${grid[x + dx][y + dy]}`);
+                                //if(navCost < Infinity)
+                                    next.push([x + dx, y + dy]);
 
                             }
 
