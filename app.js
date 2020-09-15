@@ -3,8 +3,17 @@
 // Dependencies
 const Express = require("express");
 const WebSocket = require("ws");
-
 const map = require("./map.json");
+
+// Constants
+const Tiles = {
+    WATER: 0,
+    GRASS: 1
+};
+
+const NAVGRID_RESOLUTION = 4;
+
+Object.freeze(Tiles);
 
 // Utility funcs
 const rectContains = function(width, height, x, y) {
@@ -42,7 +51,7 @@ class World {
         this.objects = [];
         this.nextObjectID = 0;
 
-        this.navgrid = this.calculateNavGrid();
+        this.navgrid = this.calculateNavGrid(0, 0);
         setInterval(() => this.update(), 50);
     }
 
@@ -52,6 +61,7 @@ class World {
         return x >= 0 &&  y >= 0 && x < this.data.length && y < this.data[0].length;
     }
 
+    // Check if world point is inside map
     contains(x, y) {
         return x > -this.width / 2 && y > -this.height / 2 && x < this.width / 2 && y < this.height / 2;
     }
@@ -116,7 +126,7 @@ class World {
                 
                 // Move according to navgrid for now
                 if(this.contains(object.x, object.y)) {
-                    let navVector = this.navgrid[Math.floor(object.x / 4 + 32)][Math.floor(object.y / 4 + 32)];
+                    let navVector = this.navgrid[Math.floor(object.x / NAVGRID_RESOLUTION + this.navgrid.length / 2)][Math.floor(object.y / NAVGRID_RESOLUTION +  + this.navgrid[0].length / 2)];
                     object.x += navVector[0] * 2;
                     object.y += navVector[1] * 2;
                 }
@@ -129,16 +139,23 @@ class World {
 
     }
 
-    calculateNavGrid() {
+    getNavCost(tileType) {
+        return ({
+            [Tiles.WATER]: Infinity,
+            [Tiles.GRASS]: 1 
+        })[tileType];
+    }
 
-        let width = map.length / 4;
-        let height = map[0].length / 4;
+    calculateNavGrid(x, y) {
+
+        let width = map.length / NAVGRID_RESOLUTION;
+        let height = map[0].length / NAVGRID_RESOLUTION;
 
         let grid = new Array(width);
         for(let i = 0; i < grid.length; i++) {
             grid[i] = new Array(height);
             for(let j = 0; j < grid[i].length; j++) {
-                grid[i][j] = Infinity;
+                grid[i][j] = NaN;
             }
         }
 
@@ -146,8 +163,13 @@ class World {
         // this code is really bad
         // it's very GC intensive and also has awful time complexity
         // but whatever
-        let front = [[32, 32]];
-        let steps = 0;
+        let front = [[
+            x / NAVGRID_RESOLUTION + width / 2,
+            y / NAVGRID_RESOLUTION + height / 2
+        ]];
+
+        // center of front is zero since it's the final destination
+        grid[front[0][0]][front[0][1]] = 0;
 
         while(front.length > 0) {
 
@@ -156,7 +178,6 @@ class World {
 
                 let x = elem[0];
                 let y = elem[1];
-                grid[x][y] = steps;
 
                 for(let dx = -1; dx <= 1; dx++) {
                     for(let dy = -1; dy <= 1; dy++) {
@@ -166,11 +187,15 @@ class World {
                         if(!rectContains(width, height, x + dx, y + dy)) continue;
 
                         // If the front has not touched this tile already...
-                        if(grid[x + dx][y + dy] === Infinity) {
+                        if(isNaN(grid[x + dx][y + dy])) {
                         
                             // Make sure this element is not already on the front
                             if(next.find(elem => elem[0] == x + dx && elem[1] == y + dy) === undefined) {
+
+                                // Average nav cost over a grid of size N (N = navgrid resolution)
+                                grid[x + dx][y + dy] = grid[x][y] + this.getNavCost(map[(x + dx) * NAVGRID_RESOLUTION][(y + dy) * NAVGRID_RESOLUTION]);
                                 next.push([x + dx, y + dy]);
+
                             }
 
                         }
@@ -181,8 +206,6 @@ class World {
             }
 
             front = next;
-
-            steps++;
 
         }
 
