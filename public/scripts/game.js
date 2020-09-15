@@ -13,7 +13,8 @@ const GameStates = {
 
 const InputTasks = {
     NONE: 0,
-    PLACING_SWARM: 1
+    PLACING_SWARM: 1,
+    SETTING_TARGET: 2
 };
 
 Object.freeze(Tiles);
@@ -41,7 +42,11 @@ class Soldier {
         ctx.save();
         ctx.fillStyle = "#ffff00";
         ctx.translate(this.x, this.y);
-        ctx.fillRect(-2, -2, 4, 4);
+        //ctx.fillRect(-0.5, -0.5, 1, 1);
+        ctx.beginPath();
+        ctx.arc(0, 0, 2, 0, 2 * Math.PI);
+        ctx.closePath();
+        ctx.fill();
         ctx.restore();
     }
 
@@ -336,14 +341,22 @@ class Input {
 
     }
 
+    createButton(text, func) {
+        let button = document.createElement("button");
+        button.appendChild(document.createTextNode(text));
+        button.addEventListener("click", func);
+        return button;
+    }
+
     addGameUI() {
 
         let tab = document.getElementById("gameTab");
 
-        this.placeSwarmButton = document.createElement("button");
-        this.placeSwarmButton.classList.add(".action");
-        this.placeSwarmButton.appendChild(document.createTextNode("Place Swarm"));
-        this.placeSwarmButton.addEventListener("click", () => this.currentTask = InputTasks.PLACING_SWARM);
+        this.placeSwarmButton = this.createButton("Place Swarm", () => this.currentTask = InputTasks.PLACING_SWARM);
+        tab.appendChild(this.placeSwarmButton);
+
+        this.setTargetButton = this.createButton("Set Target", () => this.currentTask = InputTasks.SETTING_TARGET);
+        tab.appendChild(this.setTargetButton);
 
         tab.appendChild(this.placeSwarmButton);
         
@@ -354,8 +367,14 @@ class Input {
         // Don't listen to repeat events
         if(event.repeat) return;
 
+        console.log(event.key);
+
         if(event.key === "Control") {
             this.ctrlHeld = state;
+        }
+
+        if(event.key === "Escape") {
+            this.currentTask = InputTasks.NONE;
         }
     }
     
@@ -415,6 +434,9 @@ class Input {
         if(this.currentTask === InputTasks.PLACING_SWARM) {
             this.game.remote.placeSwarm(worldCoords[0], worldCoords[1]);
             this.currentTask = InputTasks.NONE;
+        } else if(this.currentTask === InputTasks.SETTING_TARGET) {
+            this.game.remote.setTarget(worldCoords[0], worldCoords[1]);
+            this.currentTask = InputTasks.NONE;
         }
 
     }
@@ -430,6 +452,14 @@ class Remote {
     placeSwarm(x, y) {
         this.socket.send(JSON.stringify({
             type: "placeSwarm",
+            x: x,
+            y: y
+        }));
+    }
+
+    setTarget(x, y) {
+        this.socket.send(JSON.stringify({
+            type: "setTarget",
             x: x,
             y: y
         }));
@@ -497,6 +527,7 @@ class Game {
         
         // Set up world
         this.world = new World(message.mapData);
+        this.navgrid = message.debugNavgrid;
 
         for(let object of message.objects) {
             this.world.addObject(object);
