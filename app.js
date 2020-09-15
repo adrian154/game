@@ -127,8 +127,10 @@ class World {
                 // Move according to navgrid for now
                 if(this.contains(object.x, object.y)) {
                     let navVector = this.navgrid[Math.floor(object.x / NAVGRID_RESOLUTION + this.navgrid.length / 2)][Math.floor(object.y / NAVGRID_RESOLUTION +  + this.navgrid[0].length / 2)];
-                    object.x += navVector[0] * 2;
-                    object.y += navVector[1] * 2;
+                    if(navVector !== undefined) {
+                        object.x += navVector[0] * 2;
+                        object.y += navVector[1] * 2;
+                    }
                 }
 
             } 
@@ -155,7 +157,7 @@ class World {
         for(let i = 0; i < grid.length; i++) {
             grid[i] = new Array(height);
             for(let j = 0; j < grid[i].length; j++) {
-                grid[i][j] = NaN;
+                grid[i][j] = undefined;
             }
         }
 
@@ -187,7 +189,7 @@ class World {
                         if(!rectContains(width, height, x + dx, y + dy)) continue;
 
                         // If the front has not touched this tile already...
-                        if(isNaN(grid[x + dx][y + dy])) {
+                        if(grid[x + dx][y + dy] === undefined) {
                         
                             // Make sure this element is not already on the front
                             if(next.find(elem => elem[0] == x + dx && elem[1] == y + dy) === undefined) {
@@ -215,17 +217,23 @@ class World {
             vectorGrid[i] = new Array(height);
             for(let j = 0; j < vectorGrid[i].length; j++) {
 
-                let left = i - 1 >= 0 ? grid[i - 1][j] : 0;
-                let right = i + 1 < grid.length ? grid[i + 1][j] : 0;
-                let bottom = j - 1 >= 0 ? grid[i][j - 1] : 0;
-                let top = j + 1 < grid[i].length ? grid[i][j + 1] : 0;
+                if(isNaN(grid[i][j])) {
+                    vectorGrid[i][j] = undefined;
+                } else {
 
-                let length = Math.sqrt((right - left) * (right - left) + (top - bottom) * (top - bottom));
+                    let left = i - 1 >= 0 ? grid[i - 1][j] : 0;
+                    let right = i + 1 < grid.length ? grid[i + 1][j] : 0;
+                    let bottom = j - 1 >= 0 ? grid[i][j - 1] : 0;
+                    let top = j + 1 < grid[i].length ? grid[i][j + 1] : 0;
 
-                vectorGrid[i][j] = [
-                    (left - right) / length,
-                    (bottom - top) / length
-                ];
+                    let length = Math.sqrt((right - left) * (right - left) + (top - bottom) * (top - bottom));
+
+                    vectorGrid[i][j] = [
+                        (left - right) / length,
+                        (bottom - top) / length
+                    ];
+
+                }
             }
         }
 
