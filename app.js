@@ -11,8 +11,6 @@ const Tiles = {
     GRASS: 1
 };
 
-const NAVGRID_RESOLUTION = 2;
-
 Object.freeze(Tiles);
 
 // Utility funcs
@@ -135,19 +133,19 @@ class World {
                 // Move according to navgrid for now
                 if(this.contains(object.x, object.y)) {
 
-                    let navVector = this.navgrid[Math.floor(object.x / NAVGRID_RESOLUTION + this.navgrid.length / 2)][Math.floor(object.y / NAVGRID_RESOLUTION +  + this.navgrid[0].length / 2)];
+                    let navVector = this.navgrid[Math.floor(object.x + this.navgrid.length / 2)][Math.floor(object.y +  + this.navgrid[0].length / 2)];
 
                     // Don't use bad nav vectors
                     if(navVector !== undefined) {
 
                         // Calculate steering vector
-                        object.dx += navVector[0];
-                        object.dy += navVector[1];
+                        object.x += navVector[0];
+                        object.y += navVector[1];
                         object.dx *= 0.9;
                         object.dy *= 0.9;
                         object.x += object.dx;
                         object.y += object.dy;
-                        console.log(navVector);
+                        //console.log(navVector);
                         
                     }
 
@@ -160,22 +158,18 @@ class World {
 
     }
 
-    getNavCost(tileType) {
+    isTraversable(tileType) {
         return ({
-            [Tiles.WATER]: 1000,
-            [Tiles.GRASS]: 1 
+            [Tiles.WATER]: false,
+            [Tiles.GRASS]: true
         })[tileType];
     }
 
-    // Get navigation cost of a coordinate on the nav grid
-    getNavCostAvg(x, y) {
-        let sum = 0;
-        for(let i = 0; i < NAVGRID_RESOLUTION; i++) {
-            for(let j = 0; j < NAVGRID_RESOLUTION; j++) {
-                sum += this.getNavCost(map[x * NAVGRID_RESOLUTION + i][y * NAVGRID_RESOLUTION + j]);
-            }
-        }
-        return sum / (NAVGRID_RESOLUTION * NAVGRID_RESOLUTION);
+    getNavCost(tileType) {
+        return ({
+            [Tiles.WATER]: 1, // placeholder
+            [Tiles.GRASS]: 1 
+        })[tileType];
     }
 
     calculateNavGrid(x, y) {
@@ -186,8 +180,8 @@ class World {
         }
 
         // Create distance grid.
-        let width = map.length / NAVGRID_RESOLUTION;
-        let height = map[0].length / NAVGRID_RESOLUTION;
+        let width = map.length;
+        let height = map[0].length;
         let grid = new Array(width);
         for(let i = 0; i < grid.length; i++) {
             grid[i] = new Array(height);
@@ -197,8 +191,8 @@ class World {
         }
 
         // Do what is essentially a breadth-first search
-        let startX = Math.floor(x / NAVGRID_RESOLUTION + width / 2);
-        let startY = Math.floor(y / NAVGRID_RESOLUTION + height / 2);
+        let startX = Math.floor(x + width / 2);
+        let startY = Math.floor(y + height / 2);
         let front = [[startX, startY]];
 
         // Center of wavefront has a cost of 0
@@ -207,39 +201,37 @@ class World {
         // Search
         while(front.length > 0) {
 
-            // The next wavefront
-            let next = [];
-            for(let elem of front) {
-
-                // Get current coordinates
+            // Move to the next wavefront
+            let numAdded = 0;
+            while(front.length > numAdded) {
+                
+                let elem = front.pop();
                 let x = elem[0];
                 let y = elem[1];
+                let oldCost = grid[x][y];
 
-                // For each neighbor...
                 for(let dx = -1; dx <= 1; dx++) {
                     for(let dy = -1; dy <= 1; dy++) {
 
-                        // Avoid center or corners of the neighborhood
+                        // Avoid center/corners of neighborhood, they're difficult
                         if(dx != 0 && dy != 0) continue;
 
-                        // Make sure current point is inside the map
+                        // Check bounds
                         if(!rectContains(width, height, x + dx, y + dy)) continue;
 
-                        // Average nav cost over a grid of size N (N = navgrid resolution)
-                        // ...and set it
-                        if(grid[x + dx][y + dy] === undefined) {
-                            let navCost = this.getNavCostAvg(x + dx, y + dy);
-                            grid[x + dx][y + dy] = grid[x][y] + navCost;
-                            next.push([x + dx, y + dy]);
+                        let nextX = x + dx;
+                        let nextY = y + dy;
+
+                        let navCost = this.getNavCost(map[nextX][nextY]);
+                        if(grid[nextX][nextY] === undefined) {
+                            grid[nextX][nextY] = oldCost + navCost;
+                            front.push([nextX, nextY]);
                         }
 
-                    }
+                    } 
                 }
 
             }
-
-            // Discard old wavefront, switch to the new one
-            front = next;
 
         }
 
@@ -249,28 +241,24 @@ class World {
             vectorGrid[i] = new Array(height);
             for(let j = 0; j < vectorGrid[i].length; j++) {
 
-                if(isNaN(grid[i][j])) {
-                    vectorGrid[i][j] = undefined;
-                } else {
+                let left = i - 1 >= 0 ? grid[i - 1][j] : 0;
+                let right = i + 1 < grid.length ? grid[i + 1][j] : 0;
+                let bottom = j - 1 >= 0 ? grid[i][j - 1] : 0;
+                let top = j + 1 < grid[i].length ? grid[i][j + 1] : 0;
 
-                    let left = i - 1 >= 0 ? grid[i - 1][j] : 0;
-                    let right = i + 1 < grid.length ? grid[i + 1][j] : 0;
-                    let bottom = j - 1 >= 0 ? grid[i][j - 1] : 0;
-                    let top = j + 1 < grid[i].length ? grid[i][j + 1] : 0;
+                let length = Math.sqrt((right - left) * (right - left) + (top - bottom) * (top - bottom));
 
-                    let length = Math.sqrt((right - left) * (right - left) + (top - bottom) * (top - bottom));
+                vectorGrid[i][j] = [
+                    (left - right) / length,
+                    (bottom - top) / length
+                ];
 
-                    vectorGrid[i][j] = [
-                        (left - right) / length,
-                        (bottom - top) / length
-                    ];
-
-                }
             }
         }
 
         // Set vector at origin to an arbitrary vector to avoid singularity issues
         vectorGrid[startX][startY] = [1, 0];
+        console.log(vectorGrid);
         return vectorGrid;
 
     }
