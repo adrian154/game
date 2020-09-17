@@ -34,7 +34,7 @@ const make2DArray = function(xSize, ySize) {
 
 const getNavCost = function(tileType) {
     return ({
-        [Tiles.WATER]: 100,
+        [Tiles.WATER]: 10,
         [Tiles.GRASS]: 1
     })[tileType];
 }
@@ -100,7 +100,7 @@ const calculateNavigationGrid = function(map, x, y) {
     let vectorGrid = make2DArray(map.length, map[0].length);
 
     // Precalculate vectors
-    let delta = 2;
+    let delta = 3;
     let vecs = make2DArray(delta * 2 + 1, delta * 2 + 1);
     for(let x = -delta; x <= delta; x++) {
         for(let y = -delta; y <= delta; y++) {
@@ -113,8 +113,6 @@ const calculateNavigationGrid = function(map, x, y) {
         }
     }
 
-    console.log(vecs);
-
     for(let x = 0; x < vectorGrid.length; x++) {
         for(let y = 0; y < vectorGrid[x].length; y++) {
             
@@ -122,18 +120,22 @@ const calculateNavigationGrid = function(map, x, y) {
             let minDx, minDy, minCost = Infinity;
             for(let dx = -delta; dx <= delta; dx++) {
                 for(let dy = -delta; dy <= delta; dy++) {
+                    
                     if(dx == 0 && dy == 0) continue;
+
+                    // the current approach is incomplete as it does not consider cells in between the current/final cell
                     if(inBounds(x + dx, y + dy) && costGrid[x + dx][y + dy] < minCost) {
                         minDx = dx;
                         minDy = dy;
                         minCost = costGrid[x + dx][y + dy];
                     }
+
                 }
             }
 
             if(minDx != undefined && minDy != undefined) {
                 let vec = vecs[minDx + delta][minDy + delta];
-                vectorGrid[x][y] = [vec[0], vec[1]];
+                vectorGrid[x][y] = [vec[0], vec[1]]; // make a copy of the vector so changing one doesn't screw up the entire vector grid
             }
 
         }
@@ -156,9 +158,10 @@ const moveObjects = function() {
         if(navVec !== undefined) {
             let steerX = navVec[0] - object.dx;
             let steerY = navVec[1] - object.dy;
-            object.dx += steerX;
-            object.dy += steerY;
-
+            //object.dx += steerX;
+            //object.dy += steerY;
+            object.dx += navVec[0];
+            object.dy += navVec[1];
             object.x += object.dx * DT;
             object.y += object.dy * DT;
         }
