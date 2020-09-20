@@ -527,7 +527,6 @@ class Game {
         
         // Set up world
         this.world = new World(message.mapData);
-        this.navgrid = message.debugNavgrid;
 
         for(let object of message.objects) {
             this.world.addObject(object);

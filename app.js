@@ -139,7 +139,7 @@ class World {
 
     static getNavCost(tileType) {
         return ({
-            [Tiles.WATER]: 1, // placeholder
+            [Tiles.WATER]: 10, // placeholder
             [Tiles.GRASS]: 1 
         })[tileType];
     }
@@ -154,7 +154,7 @@ class World {
                 if(x == 0 && y == 0) continue;
                 
                 let length = Math.sqrt(x * x + y * y);
-                vecs[x + delta][y + delta] = [
+                vectors[x + delta][y + delta] = [
                     x / length,
                     y / length
                 ];
@@ -246,10 +246,9 @@ class World {
 
     }
 
-    static calculateCostGrid(x, y) {
+    calculateCostGrid(x, y) {
         
-        let costGrid = make2DArray(map.length, map[0].length);
-
+        let costGrid = make2DArray(this.width, this.height);
         let frontier = [[x, y]];
         costGrid[x][y] = 0;
 
@@ -267,13 +266,15 @@ class World {
                 for(let dx = -1; dx <= 1; dx++) {
                     for(let dy = -1; dy <= 1; dy++) {
 
-                        if(dx != 0 && dy != 0 || dx === dy) continue;
+                        if(!(dx == 0 ^ dy == 0)) {
+                            continue;
+                        }
 
                         let nextX = x + dx;
-                        let nextY = y = dy;
+                        let nextY = y + dy;
                         
                         if(this.containsIndex(nextX, nextY)) {
-                            let nextNavCost = World.getNavCost(map[nextX][nextY]);
+                            let nextNavCost = World.getNavCost(this.data[nextX][nextY]);
                             if(costGrid[nextX][nextY] === undefined && nextNavCost >= curNavCost) {
                                 frontier.unshift([nextX, nextY]);
                                 costGrid[nextX][nextY] = curCost + nextNavCost;
@@ -292,7 +293,7 @@ class World {
 
     }
 
-    static calculateVectorGrid(vectors, coefficients, costGrid, delta, x, y) {
+    calculateVectorGrid(vectors, coefficients, costGrid, delta) {
 
         let vectorGrid = make2DArray(this.width, this.height);
 
@@ -309,7 +310,7 @@ class World {
                         let coeffs = coefficients[dx + delta][dy + delta];
                         let cost = 0, totAmount = 0;
                         for(let elem of coeffs) {
-                            if(inBounds(x + elem.x, y + elem.y)) {
+                            if(this.containsIndex(x + elem.x, y + elem.y)) {
                                 cost += costGrid[x + elem.x][y + elem.y] * elem.amount;
                                 totAmount += elem.amount;
                             }
@@ -326,8 +327,7 @@ class World {
                 }
 
                 if(minDx !== undefined && minDy !== undefined) {
-                    let vector = vectors[minDx + delta][minDy + delta];
-                    vectorGrid[x][y] = [vector[0], vector[1]];
+                    vectorGrid[x][y] = vectors[minDx + delta][minDy + delta];
                 }
 
             }
@@ -337,15 +337,24 @@ class World {
 
     }
 
-    static calculateNavGrid(x, y) {
+    calculateNavGrid(x, y) {
+
+        if(!this.containsPoint(x, y)) {
+            throw new Error("Can't calculate navgrid to point outside of map.");
+        }
+
+        // Convert to world coordinates
+        x = Math.floor(x + this.width / 2);
+        y = Math.floor(y + this.height / 2);
 
         const resolution = 5;
 
-        let costGrid = World.calculateCostGrid(x, y);
         let vectors = World.calculateVectors(resolution);
         let coefficients = World.calculateVectorCoefficients(vectors, resolution);
+        let costGrid = this.calculateCostGrid(x, y);
+        let vectorGrid = this.calculateVectorGrid(vectors, coefficients, costGrid, resolution);
 
-        return World.calculateVectorGrid(vectors, coefficients, costGrid, resolution, x, y);
+        return vectorGrid;
 
     }
 
@@ -386,8 +395,7 @@ class GameServer {
         socket.send(JSON.stringify({
             type: "gameStart",
             mapData: this.map.data,
-            objects: this.map.objects,
-            debugNavgrid: this.map.navgrid
+            objects: this.map.objects
         }));
 
         this.broadcastChatMessage(`Player ${player.name} joined the game`);

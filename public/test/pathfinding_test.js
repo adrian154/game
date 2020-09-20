@@ -39,6 +39,8 @@ const getNavCost = function(tileType) {
     })[tileType];
 }
 
+const inBounds = (x, y) => x >= 0 && y >= 0 && x < map.length && y < map[0].length;
+
 const calculateNavigationGrid = function(map, x, y) {
 
     // Create a grid of distance
@@ -187,6 +189,8 @@ const calculateNavigationGrid = function(map, x, y) {
 
         }
     }
+
+    console.log(coefficients);
 
     for(let x = 0; x < vectorGrid.length; x++) {
         for(let y = 0; y < vectorGrid[x].length; y++) {
