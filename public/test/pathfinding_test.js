@@ -100,16 +100,95 @@ const calculateNavigationGrid = function(map, x, y) {
     let vectorGrid = make2DArray(map.length, map[0].length);
 
     // Precalculate vectors
-    let delta = 3;
+    let delta = 2;
     let vecs = make2DArray(delta * 2 + 1, delta * 2 + 1);
     for(let x = -delta; x <= delta; x++) {
         for(let y = -delta; y <= delta; y++) {
+
             if(x == 0 && y == 0) continue;
             let length = Math.sqrt(x * x + y * y);
+            
             vecs[x + delta][y + delta] = [
                 x / length,
                 y / length
             ];
+
+        }
+    }
+
+    let coefficients = make2DArray(delta * 2 + 1, delta * 2 + 1)
+
+    // Precompute vector path coefficients
+    for(let targetDx = -delta; targetDx <= delta; targetDx++) {
+        for(let targetDy = -delta; targetDy <= delta; targetDy++) {
+
+            if(targetDx == 0 && targetDy == 0) continue;
+
+            let vector = vecs[targetDx + delta][targetDy + delta];
+
+            let points = [
+                [0, 0],
+                [targetDx, targetDy]
+            ];
+
+            // Horizontals
+            for(let y = 0.5 * Math.sign(vector[1]); vector[1] < 0 ? y > targetDy : y < targetDy; y += Math.sign(vector[1])) {
+                points.push([
+                    y * targetDx / targetDy,
+                    y
+                ]);
+            }
+
+            // Verticals
+            // Only if the vector isn't perfectly diagonal will the verticals be evaluated.
+            // This is an arbitrary decision to avoid situations where a diagonal vector will have double the number of points it should have.
+            if(Math.abs(vector[1] - vector[0]) > 0.001) {
+                for(let x = 0.5 * Math.sign(vector[0]); vector[0] < 0 ? x > targetDx : x < targetDx; x += Math.sign(vector[0])) {
+                    points.push([
+                        x,
+                        x * targetDy / targetDx
+                    ]);
+                }
+            }
+            
+            // Sort points
+            // The direction doesn't really matter as long as they are sorted
+            if(Math.abs(vector[1]) > Math.abs(vector[0])) {
+
+                // Slope > 1: Sort by y-axis
+                points.sort((a, b) => a[1] - b[1]);
+
+            } else {
+
+                // Sort by x
+                points.sort((a, b) => a[0] - b[0]);
+
+            }
+
+            // Determine coefficients
+            let coeffs = [];
+
+            for(let i = 0; i < points.length - 1; i++) {
+
+                let first = points[i];
+                let next = points[i + 1];
+
+                let dx = next[0] - first[0];
+                let dy = next[1] - first[1];
+                let cx = first[0] + dx / 2;
+                let cy = first[1] + dy / 2;
+                let length = Math.sqrt(dx * dx + dy * dy);
+
+                coeffs.push({
+                    x: Math.floor(cx + 0.5),
+                    y: Math.floor(cy + 0.5),
+                    amount: length
+                });
+
+            }
+
+            coefficients[targetDx + delta][targetDy + delta] = coeffs;
+
         }
     }
 
@@ -123,11 +202,20 @@ const calculateNavigationGrid = function(map, x, y) {
                     
                     if(dx == 0 && dy == 0) continue;
 
-                    // the current approach is incomplete as it does not consider cells in between the current/final cell
-                    if(inBounds(x + dx, y + dy) && costGrid[x + dx][y + dy] < minCost) {
+                    let coeffs = coefficients[dx + delta][dy + delta];
+                    let cost = 0;
+                    for(let elem of coeffs) {
+                        if(inBounds(x + elem.x, y + elem.y)) {
+                            cost += costGrid[x + elem.x][y + elem.y] * elem.amount;
+                        }
+                    }
+
+                    cost /= coeffs.length;
+
+                    if(cost < minCost) {
                         minDx = dx;
                         minDy = dy;
-                        minCost = costGrid[x + dx][y + dy];
+                        minCost = cost;
                     }
 
                 }
