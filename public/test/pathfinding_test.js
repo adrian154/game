@@ -39,10 +39,6 @@ const getNavCost = function(tileType) {
     })[tileType];
 }
 
-const inBounds = function(x, y) {
-    return x >= 0 && y >= 0 && x < map.length && y < map[0].length;
-}
-
 const calculateNavigationGrid = function(map, x, y) {
 
     // Create a grid of distance
@@ -100,7 +96,7 @@ const calculateNavigationGrid = function(map, x, y) {
     let vectorGrid = make2DArray(map.length, map[0].length);
 
     // Precalculate vectors
-    let delta = 2;
+    let delta = 5;
     let vecs = make2DArray(delta * 2 + 1, delta * 2 + 1);
     for(let x = -delta; x <= delta; x++) {
         for(let y = -delta; y <= delta; y++) {
@@ -204,13 +200,15 @@ const calculateNavigationGrid = function(map, x, y) {
 
                     let coeffs = coefficients[dx + delta][dy + delta];
                     let cost = 0;
+                    let totLength = 0;
                     for(let elem of coeffs) {
                         if(inBounds(x + elem.x, y + elem.y)) {
                             cost += costGrid[x + elem.x][y + elem.y] * elem.amount;
+                            totLength += elem.amount;
                         }
                     }
 
-                    cost /= coeffs.length;
+                    cost /= totLength;
 
                     if(cost < minCost) {
                         minDx = dx;
@@ -258,10 +256,25 @@ const moveObjects = function() {
 
 const draw = function() {
 
+    ctx.imageSmoothingEnabled = true;
+    ctx.lineWidth = 2;
+
     for(let x = 0; x < map.length; x++) {
         for(let y = 0; y < map[x].length; y++) {
+        
             ctx.fillStyle = getColor(map[x][y]);
             ctx.fillRect(x * TILE_WIDTH, y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT);
+
+            /*
+            let vector = navGrid[x][y];
+            let length = 10;
+            ctx.beginPath();
+            ctx.moveTo(x * TILE_WIDTH + TILE_WIDTH / 2, y * TILE_HEIGHT + TILE_HEIGHT / 2);
+            ctx.lineTo(x * TILE_WIDTH + TILE_WIDTH / 2 + vector[0] * length, y * TILE_HEIGHT + TILE_HEIGHT / 2 + vector[1] * length);
+            ctx.closePath();
+            ctx.stroke();
+            */
+
         }
     }
 

@@ -13,10 +13,16 @@ const Tiles = {
 
 Object.freeze(Tiles);
 
-// Utility funcs
-const rectContains = function(width, height, x, y) {
-    return x >= 0 && y >= 0 && x < width && y < height;
-}
+const make2DArray = function(xSize, ySize) {
+    let result = new Array(xSize);
+    for(let i = 0; i < xSize; i++) {
+        result[i] = new Array(ySize);
+        for(let j = 0; j < ySize; j++) {
+            result[i][j] = undefined;
+        }
+    }
+    return result;
+};
 
 class App {
 
@@ -55,12 +61,12 @@ class World {
 
     // It's assumed that the map is rectangular
     // Check if indices are inside map
-    inside(x, y) {
+    containsIndex(x, y) {
         return x >= 0 &&  y >= 0 && x < this.data.length && y < this.data[0].length;
     }
 
     // Check if world point is inside map
-    contains(x, y) {
+    containsPoint(x, y) {
         return x > -this.width / 2 && y > -this.height / 2 && x < this.width / 2 && y < this.height / 2;
     }
 
@@ -127,139 +133,217 @@ class World {
     update() {
 
         // Update soldiers (pathfind)
-        for(let object of this.objects) {
-            if(object.type === "soldier") {
-                
-                // Move according to navgrid for now
-                if(this.contains(object.x, object.y)) {
-
-                    let navVector = this.navgrid[Math.floor(object.x + this.navgrid.length / 2)][Math.floor(object.y +  + this.navgrid[0].length / 2)];
-
-                    // Don't use bad nav vectors
-                    if(navVector !== undefined) {
-
-                        // Calculate steering vector
-                        object.x += navVector[0];
-                        object.y += navVector[1];
-                        object.dx *= 0.9;
-                        object.dy *= 0.9;
-                        object.x += object.dx;
-                        object.y += object.dy;
-                        //console.log(navVector);
-                        
-                    }
-
-                }
-
-            } 
-        }
-
         this.broadcastObjectUpdate();
 
     }
 
-    isTraversable(tileType) {
-        return ({
-            [Tiles.WATER]: false,
-            [Tiles.GRASS]: true
-        })[tileType];
-    }
-
-    getNavCost(tileType) {
+    static getNavCost(tileType) {
         return ({
             [Tiles.WATER]: 1, // placeholder
             [Tiles.GRASS]: 1 
         })[tileType];
     }
 
-    calculateNavGrid(x, y) {
+    static calculateVectors(delta) {
 
-        // Make sure target is inside map.
-        if(!this.contains(x, y)) {
-            throw new Error("Can't pathfind to point outside map.");
-        }
+        let vectors = make2DArray(delta * 2 + 1, delta * 2 + 1);
+        
+        for(let x = -delta; x <= delta; x++) {
+            for(let y = -delta; y <= delta; y++) {
+                
+                if(x == 0 && y == 0) continue;
+                
+                let length = Math.sqrt(x * x + y * y);
+                vecs[x + delta][y + delta] = [
+                    x / length,
+                    y / length;
+                ];
 
-        // Create distance grid.
-        let width = map.length;
-        let height = map[0].length;
-        let grid = new Array(width);
-        for(let i = 0; i < grid.length; i++) {
-            grid[i] = new Array(height);
-            for(let j = 0; j < grid[i].length; j++) {
-                grid[i][j] = undefined;
             }
         }
 
-        // Do what is essentially a breadth-first search
-        let startX = Math.floor(x + width / 2);
-        let startY = Math.floor(y + height / 2);
-        let front = [[startX, startY]];
+        return vectors;
 
-        // Center of wavefront has a cost of 0
-        grid[startX][startY] = 0;
+    }
 
-        // Search
-        while(front.length > 0) {
+    static calculateVectorCoefficients(vectors, delta) {
 
-            // Move to the next wavefront
-            let numAdded = 0;
-            while(front.length > numAdded) {
+        let coefficients = make2DArray(delta * 2 + 1, delta * 2 + 1);
+
+        for(let targetDx = -delta; targetDx <= delta; targetDx++) {
+            for(let targetDy = -delta; targetDy <= delta; targetDy++) {
+
+                if(targetDx == 0 && targetDy == 0) continue;
                 
-                let elem = front.pop();
+                let vector = vectors[targetDx + delta][targetDy + delta];
+                let points = [
+                    [0, 0],
+                    [targetDx, targetDy]
+                ];
+
+                // Horizontals
+            for(let y = 0.5 * Math.sign(vector[1]); vector[1] < 0 ? y > targetDy : y < targetDy; y += Math.sign(vector[1])) {
+                points.push([
+                    y * targetDx / targetDy,
+                    y
+                ]);
+            }
+
+            // Verticals
+            // Only if the vector isn't perfectly diagonal will the verticals be evaluated.
+            // This is an arbitrary decision to avoid situations where a diagonal vector will have double the number of points it should have.
+            if(Math.abs(vector[1] - vector[0]) > 0.001) {
+                for(let x = 0.5 * Math.sign(vector[0]); vector[0] < 0 ? x > targetDx : x < targetDx; x += Math.sign(vector[0])) {
+                    points.push([
+                        x,
+                        x * targetDy / targetDx
+                    ]);
+                }
+            }
+            
+            // Sort points
+            // The direction doesn't really matter as long as they are sorted
+            if(Math.abs(vector[1]) > Math.abs(vector[0])) {
+
+                // Slope > 1: Sort by y-axis
+                points.sort((a, b) => a[1] - b[1]);
+
+            } else {
+
+                // Sort by x
+                points.sort((a, b) => a[0] - b[0]);
+
+            }
+
+            // Determine coefficients
+            let coeffs = [];
+            for(let i = 0; i < points.length - 1; i++) {
+
+                let first = points[i];
+                let next = points[i + 1];
+
+                let dx = next[0] - first[0];
+                let dy = next[1] - first[1];
+                let cx = first[0] + dx / 2;
+                let cy = first[1] + dy / 2;
+                let length = Math.sqrt(dx * dx + dy * dy);
+
+                coeffs.push({
+                    x: Math.floor(cx + 0.5),
+                    y: Math.floor(cy + 0.5),
+                    amount: length
+                });
+
+            }
+
+            coefficients[targetDx + delta][targetDy + delta] = coeffs;
+
+        }
+
+        return coefficients;
+
+    }
+
+    static calculateCostGrid(x, y) {
+        
+        let costGrid = make2DArray(map.length, map[0].length);
+
+        let frontier = [[x, y]];
+        costGrid[x][y] = 0;
+
+        while(frontier.length > 0) {
+
+            let numAdded = 0;
+            while(frontier.length > numAdded) {
+
+                let elem = frontier.pop();
                 let x = elem[0];
                 let y = elem[1];
-                let oldCost = grid[x][y];
+                let curCost = costGrid[x][y];
+                let curNavCost = World.getNavCost(this.data[x][y]);
 
                 for(let dx = -1; dx <= 1; dx++) {
                     for(let dy = -1; dy <= 1; dy++) {
 
-                        // Avoid center/corners of neighborhood, they're difficult
-                        if(dx != 0 && dy != 0) continue;
-
-                        // Check bounds
-                        if(!rectContains(width, height, x + dx, y + dy)) continue;
+                        if(dx != 0 && dy != 0 || dx === dy) continue;
 
                         let nextX = x + dx;
-                        let nextY = y + dy;
-
-                        let navCost = this.getNavCost(map[nextX][nextY]);
-                        if(grid[nextX][nextY] === undefined) {
-                            grid[nextX][nextY] = oldCost + navCost;
-                            front.push([nextX, nextY]);
+                        let nextY = y = dy;
+                        
+                        if(this.containsIndex(nextX, nextY)) {
+                            let nextNavCost = World.getNavCost(map[nextX][nextY]);
+                            if(costGrid[nextX][nextY] === undefined && nextNavCost >= curNavCost) {
+                                frontier.unshift([nextX, nextY]);
+                                costGrid[nextX][nextY] = curCost + nextNavCost;
+                                numAdded++;
+                            }
                         }
 
-                    } 
+                    }
                 }
 
             }
 
         }
 
-        // convert distance grid to vectors
-        let vectorGrid = new Array(width);
-        for(let i = 0; i < vectorGrid.length; i++) {
-            vectorGrid[i] = new Array(height);
-            for(let j = 0; j < vectorGrid[i].length; j++) {
+        return costGrid;
 
-                let left = i - 1 >= 0 ? grid[i - 1][j] : 0;
-                let right = i + 1 < grid.length ? grid[i + 1][j] : 0;
-                let bottom = j - 1 >= 0 ? grid[i][j - 1] : 0;
-                let top = j + 1 < grid[i].length ? grid[i][j + 1] : 0;
+    }
 
-                let length = Math.sqrt((right - left) * (right - left) + (top - bottom) * (top - bottom));
+    static calculateVectorGrid(vectors, coefficients, costGrid, delta, x, y) {
 
-                vectorGrid[i][j] = [
-                    (left - right) / length,
-                    (bottom - top) / length
-                ];
+        let vectorGrid = make2DArray(this.width, this.height);
+
+        for(let x = 0; x < vectorGrid.length; x++) {
+            for(let y = 0; y < vectorGrid[x].length; y++) {
+
+                // Find vector with minimal cost
+                let minDx, minDy, minCost = Infinity;
+                for(let dx = -delta; dx <= delta; dx++) {
+                    for(let dy = -delta; dy <= delta; dy++) {
+
+                        if(dx == 0 && dy == 0) continue;
+
+                        let coeffs = coefficients[dx + delta][dy + delta];
+                        let cost = 0, totAmount = 0;
+                        for(let elem of coeffs) {
+                            if(inBounds(x + elem.x, y + elem.y)) {
+                                cost += costGrid[x + elem.x][y + elem.y] * elem.amount;
+                                totAmount += elem.amount;
+                            }
+                        }
+
+                        cost /= totAmount;
+                        if(cost < minCost) {
+                            minDx = dx;
+                            minDy = dy;
+                            minCost = cost;
+                        }
+
+                    }
+                }
+
+                if(minDx !== undefined && minDy !== undefined) {
+                    let vector = vectors[minDx + delta][minDy + delta];
+                    vectorGrid[x][y] = [vector[0], vector[1]];
+                }
 
             }
         }
 
-        // Set vector at origin to an arbitrary vector to avoid singularity issues
-        vectorGrid[startX][startY] = [1, 0];
-        console.log(vectorGrid);
         return vectorGrid;
+
+    }
+
+    static calculateNavGrid(x, y) {
+
+        const resolution = 5;
+
+        let costGrid = World.calculateCostGrid(x, y);
+        let vectors = World.calculateVectors(resolution);
+        let coefficients = World.calculateVectorCoefficients(vectors, resolution);
+
+        return World.calculateVectorGrid(vectors, coefficients, costGrid, resolution, x, y);
 
     }
 
