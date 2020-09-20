@@ -156,7 +156,7 @@ class World {
                 let length = Math.sqrt(x * x + y * y);
                 vecs[x + delta][y + delta] = [
                     x / length,
-                    y / length;
+                    y / length
                 ];
 
             }
@@ -182,61 +182,63 @@ class World {
                 ];
 
                 // Horizontals
-            for(let y = 0.5 * Math.sign(vector[1]); vector[1] < 0 ? y > targetDy : y < targetDy; y += Math.sign(vector[1])) {
-                points.push([
-                    y * targetDx / targetDy,
-                    y
-                ]);
-            }
-
-            // Verticals
-            // Only if the vector isn't perfectly diagonal will the verticals be evaluated.
-            // This is an arbitrary decision to avoid situations where a diagonal vector will have double the number of points it should have.
-            if(Math.abs(vector[1] - vector[0]) > 0.001) {
-                for(let x = 0.5 * Math.sign(vector[0]); vector[0] < 0 ? x > targetDx : x < targetDx; x += Math.sign(vector[0])) {
+                for(let y = 0.5 * Math.sign(vector[1]); vector[1] < 0 ? y > targetDy : y < targetDy; y += Math.sign(vector[1])) {
                     points.push([
-                        x,
-                        x * targetDy / targetDx
+                        y * targetDx / targetDy,
+                        y
                     ]);
                 }
-            }
+
+                // Verticals
+                // Only if the vector isn't perfectly diagonal will the verticals be evaluated.
+                // This is an arbitrary decision to avoid situations where a diagonal vector will have double the number of points it should have.
+                if(Math.abs(vector[1] - vector[0]) > 0.001) {
+                    for(let x = 0.5 * Math.sign(vector[0]); vector[0] < 0 ? x > targetDx : x < targetDx; x += Math.sign(vector[0])) {
+                        points.push([
+                            x,
+                            x * targetDy / targetDx
+                        ]);
+                    }
+                }
+                
+                // Sort points
+                // The direction doesn't really matter as long as they are sorted
+                if(Math.abs(vector[1]) > Math.abs(vector[0])) {
+
+                    // Slope > 1: Sort by y-axis
+                    points.sort((a, b) => a[1] - b[1]);
+
+                } else {
+
+                    // Sort by x
+                    points.sort((a, b) => a[0] - b[0]);
+
+                }
+
+                // Determine coefficients
+                let coeffs = [];
+                for(let i = 0; i < points.length - 1; i++) {
+
+                    let first = points[i];
+                    let next = points[i + 1];
+
+                    let dx = next[0] - first[0];
+                    let dy = next[1] - first[1];
+                    let cx = first[0] + dx / 2;
+                    let cy = first[1] + dy / 2;
+                    let length = Math.sqrt(dx * dx + dy * dy);
+
+                    coeffs.push({
+                        x: Math.floor(cx + 0.5),
+                        y: Math.floor(cy + 0.5),
+                        amount: length
+                    });
+
+                }
+
+                coefficients[targetDx + delta][targetDy + delta] = coeffs;
             
-            // Sort points
-            // The direction doesn't really matter as long as they are sorted
-            if(Math.abs(vector[1]) > Math.abs(vector[0])) {
-
-                // Slope > 1: Sort by y-axis
-                points.sort((a, b) => a[1] - b[1]);
-
-            } else {
-
-                // Sort by x
-                points.sort((a, b) => a[0] - b[0]);
-
             }
-
-            // Determine coefficients
-            let coeffs = [];
-            for(let i = 0; i < points.length - 1; i++) {
-
-                let first = points[i];
-                let next = points[i + 1];
-
-                let dx = next[0] - first[0];
-                let dy = next[1] - first[1];
-                let cx = first[0] + dx / 2;
-                let cy = first[1] + dy / 2;
-                let length = Math.sqrt(dx * dx + dy * dy);
-
-                coeffs.push({
-                    x: Math.floor(cx + 0.5),
-                    y: Math.floor(cy + 0.5),
-                    amount: length
-                });
-
-            }
-
-            coefficients[targetDx + delta][targetDy + delta] = coeffs;
 
         }
 
