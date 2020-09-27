@@ -13,8 +13,7 @@ const GameStates = {
 
 const InputTasks = {
     NONE: 0,
-    PLACING_SWARM: 1,
-    SETTING_TARGET: 2
+    PLACING_UNIT: 1
 };
 
 Object.freeze(Tiles);
@@ -357,14 +356,11 @@ class Input {
 
         let tab = document.getElementById("gameTab");
 
-        this.placeSwarmButton = this.createButton("Place Swarm", () => this.currentTask = InputTasks.PLACING_SWARM);
-        tab.appendChild(this.placeSwarmButton);
-
-        this.setTargetButton = this.createButton("Set Target", () => this.currentTask = InputTasks.SETTING_TARGET);
-        tab.appendChild(this.setTargetButton);
-
-        tab.appendChild(this.placeSwarmButton);
-        
+        this.placeUnitButton = this.createButton("Place Light Infantry", () => {
+            this.currentTask = InputTasks.PLACING_UNIT;
+            this.selectedUnit = "LightInfantry";
+        });
+        tab.appendChild(this.placeUnitButton);
     }
 
     handleKey(event, state) {
@@ -433,13 +429,9 @@ class Input {
     handleClick(event) {
 
         let worldCoords = this.renderer.untransformCoords(event.offsetX, event.offsetY);
-        
-        if(this.currentTask === InputTasks.PLACING_SWARM) {
-            this.game.remote.placeSwarm(worldCoords[0], worldCoords[1]);
-            //this.currentTask = InputTasks.NONE;
 
-        } else if(this.currentTask === InputTasks.SETTING_TARGET) {
-            this.game.remote.setTarget(worldCoords[0], worldCoords[1]);
+        if(this.currentTask === InputTasks.PLACING_UNIT) {
+            this.game.remote.placeUnit(this.selectedUnit, worldCoords[0], worldCoords[1]);
             this.currentTask = InputTasks.NONE;
         }
 
@@ -453,17 +445,10 @@ class Remote {
         this.socket = socket;
     }
 
-    placeSwarm(x, y) {
+    placeUnit(type, x, y) {
         this.socket.send(JSON.stringify({
-            type: "placeSwarm",
-            x: x,
-            y: y
-        }));
-    }
-
-    setTarget(x, y) {
-        this.socket.send(JSON.stringify({
-            type: "setTarget",
+            type: "placeUnit",
+            unitType: type,
             x: x,
             y: y
         }));

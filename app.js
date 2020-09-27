@@ -27,13 +27,13 @@ class App {
 
 class GameObject {
 
-    constructor(world, x, y) {
+    constructor(world, x, y, radius) {
         this.world = world;
         this.x = x;
         this.y = y;
         this.dx = 0;
         this.dy = 0;
-        this.type = "bogus";
+        this.radius = radius;
     }
 
     update() {
@@ -49,12 +49,15 @@ class GameObject {
             let dx = other.x - this.x;
             let dy = other.y - this.y;
             let distSquared = dx * dx + dy * dy;
-            if(distSquared < 1) {
+            let minDist = this.radius + other.radius;
+            if(distSquared < minDist * minDist) {
              
                 let dist = Math.sqrt(distSquared);
-                let overlap = (1 - dist) / 2;
+                let overlap = (minDist - dist) / 2;
                 nextX -= overlap * dx / dist;
                 nextY -= overlap * dy / dist;
+                other.x += overlap * dx / dist;
+                other.y += overlap * dy / dist;
 
             }
 
@@ -74,25 +77,44 @@ class GameObject {
 class Soldier extends GameObject {
 
     constructor(world, x, y, navgrid) {
-        super(world, x, y);
+        super(world, x, y, 0.5);
         this.type = "soldier";
         this.navgrid = navgrid;
     }
 
     update() {
         
-        let nvx = Math.floor(this.x + this.navgrid.length / 2);
-        let nvy = Math.floor(this.y + this.navgrid[nvx].length / 2);
-        let vector = this.navgrid[nvx][nvy];
+        let nvx = Math.floor(this.x + this.navgrid.vectors.length / 2);
+        let nvy = Math.floor(this.y + this.navgrid.vectors[nvx].length / 2);
+        let vector = this.navgrid.vectors[nvx][nvy];
         let cost = World.getNavCost(map[nvx][nvy]);
 
         if(vector) {
-            this.dx = vector[0] * 2 / cost;
-            this.dy = vector[1] * 2 / cost;
+
+            // Stop pathfinding once decently close to prevent clusterfucking
+            let coeff = 2;
+            let sqDistToTarget = (this.x - this.navgrid.targetX) * (this.x - this.navgrid.targetX) + (this.y - this.navgrid.targetY) * (this.y - this.navgrid.targetY);
+            if(!this.navgrid.cluster && sqDistToTarget < 16) {
+                coeff = Math.max(sqDistToTarget - 12, 0);
+            }
+
+            this.dx = vector[0] * coeff / cost;
+            this.dy = vector[1] * coeff / cost;
+
         }
 
         super.update();
 
+    }
+
+}
+
+class Unit {
+
+    constructor(id, type, objectIDs) {
+        this.id = id;
+        this.type = type;
+        this.objects = objectIDs;
     }
 
 }
@@ -119,7 +141,7 @@ class World {
         this.nextObjectID = 0;
 
         // Real quick
-        this.navgrid = this.calculateNavGrid(0, 0);
+        this.navgrid = this.calculateNavGrid(0, 0, false);
     
         // Start update tick
         setInterval(() => this.update(), 50);
@@ -147,17 +169,29 @@ class World {
         this.objects[object.type][id] = object;
         this.objectsFlat[id] = object;
         this.broadcastObjectCreation(id, object);
+        return id;
     }
 
     // Add an object based on a message payload
-    handlePlaceSwarm(message, socket) {
+    handlePlaceUnit(message, player) {
+        
+        let objectIDs = [];
 
-        // Add tons of soldiers
-        for(let i = 0; i < 10; i++) {
-            let angle = Math.random() * 2 * Math.PI;
-            let dist = Math.random()  * 5;
-            this.addObject(new Soldier(this, message.x + Math.cos(angle) * dist, message.y + Math.sin(angle) * dist, this.navgrid));
+        if(message.unitType === "LightInfantry") {
+        
+            // Add tons of soldiers
+            for(let i = 0; i < 10; i++) {
+                let angle = Math.random() * 2 * Math.PI;
+                let dist = Math.random()  * 5;
+                let soldier = new Soldier(this, message.x + Math.cos(angle) * dist, message.y + Math.sin(angle) * dist, this.navgrid);
+                objectIDs.push(this.addObject(soldier));
+                this.addObject(soldier);
+            }
+        
         }
+
+        let unit = new Unit(this.getNextObjectID(), message.unitType, objectIDs);
+        player.units.push(unit);
 
     }
 
@@ -213,7 +247,7 @@ class World {
 
     static getNavCost(tileType) {
         return ({
-            [Util.Tiles.WATER]: 3, // placeholder
+            [Util.Tiles.WATER]: 10, // placeholder
             [Util.Tiles.GRASS]: 1 
         })[tileType];
     }
@@ -411,24 +445,29 @@ class World {
 
     }
 
-    calculateNavGrid(x, y) {
+    calculateNavGrid(x, y, cluster) {
 
         if(!this.containsPoint(x, y)) {
             throw new Error("Can't calculate navgrid to point outside of map.");
         }
 
         // Convert to world coordinates
-        x = Math.floor(x + this.width / 2);
-        y = Math.floor(y + this.height / 2);
+        let cx = Math.floor(x + this.width / 2);
+        let cy = Math.floor(y + this.height / 2);
 
         const resolution = 5;
 
         let vectors = World.calculateVectors(resolution);
         let coefficients = World.calculateVectorCoefficients(vectors, resolution);
-        let costGrid = this.calculateCostGrid(x, y);
+        let costGrid = this.calculateCostGrid(cx, cy);
         let vectorGrid = this.calculateVectorGrid(vectors, coefficients, costGrid, resolution);
 
-        return vectorGrid;
+        return {
+            targetX: x,
+            targetY: y,
+            cluster: cluster,
+            vectors: vectorGrid
+        };
 
     }
 
@@ -458,6 +497,7 @@ class GameServer {
         let player = {
             name: message.name,
             id: this.nextPlayerID,
+            units: [],
             socket: socket
         };
 
@@ -492,6 +532,29 @@ class GameServer {
 
     }
 
+    addUnit(player, unit) {
+    
+        player.socket.send(JSON.stringify({
+            type: "addUnit",
+            unit: unit
+        }));
+    
+    }
+
+    destroyUnit(player, id) {
+        
+        let idx = player.units.find(elem => elem.id === id);
+        player.unit.splice(idx, 1);
+
+        if(idx) {
+            player.socket.send(JSON.stringify({
+                type: "destroyUnit",
+                id: id    
+            }));
+        }
+
+    }
+
     handleMessage(message, socket) {
         
         message = JSON.parse(message);
@@ -499,7 +562,7 @@ class GameServer {
         // Dispatch handler
         let handlers = {
             joinGame: message => this.handleJoinGame(message, socket),
-            placeSwarm: message => this.map.handlePlaceSwarm(message, socket),
+            placeUnit: message => this.handlePlaceUnit(message, socket),
             chatMessage: message => this.handleChatMessage(message, socket),
             setTarget: message => this.map.handleSetTarget(message, socket)
         };
@@ -514,6 +577,10 @@ class GameServer {
             console.log(`WARNING: Unknown message type ${message.type}, ignoring`);
         }
 
+    }
+
+    handlePlaceUnit(message, socket) {
+        this.map.handlePlaceUnit(message, socket.player);
     }
 
     handleChatMessage(message, socket) {
@@ -537,7 +604,9 @@ class GameServer {
         let index = this.players.findIndex(player => player.id === socket.player.id);
         this.players.splice(index, 1);
         this.broadcastUpdatePlayerList();
-        this.broadcastChatMessage(`Player ${socket.player.name} left the game`);
+
+        if(socket.player)
+            this.broadcastChatMessage(`Player ${socket.player.name} left the game`);
 
     }
     
