@@ -84,10 +84,11 @@ class Soldier extends GameObject {
         let nvx = Math.floor(this.x + this.navgrid.length / 2);
         let nvy = Math.floor(this.y + this.navgrid[nvx].length / 2);
         let vector = this.navgrid[nvx][nvy];
+        let cost = World.getNavCost(map[nvx][nvy]);
 
         if(vector) {
-            this.dx = vector[0] * 2;
-            this.dy = vector[1] * 2;
+            this.dx = vector[0] * 2 / cost;
+            this.dy = vector[1] * 2 / cost;
         }
 
         super.update();
@@ -212,7 +213,7 @@ class World {
 
     static getNavCost(tileType) {
         return ({
-            [Util.Tiles.WATER]: 10, // placeholder
+            [Util.Tiles.WATER]: 3, // placeholder
             [Util.Tiles.GRASS]: 1 
         })[tileType];
     }
