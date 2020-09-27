@@ -4,6 +4,12 @@ const WebSocket = require("ws");
 const Util = require("./util.js");
 const map = require("./map.json");
 
+const SOLDIER_BASE_SPEED = 5;
+const SOLDIER_NAV_COSTS = {
+    [Util.Tiles.WATER]: 5,
+    [Util.Tiles.GRASS]: 1
+};
+
 class App {
 
     constructor(options) {
@@ -27,13 +33,14 @@ class App {
 
 class GameObject {
 
-    constructor(world, x, y, radius) {
+    constructor(world, x, y, radius, creator) {
         this.world = world;
         this.x = x;
         this.y = y;
         this.dx = 0;
         this.dy = 0;
         this.radius = radius;
+        this.creator = creator;
     }
 
     update() {
@@ -74,37 +81,59 @@ class GameObject {
 
 }
 
-class Soldier extends GameObject {
+class DynamicObject extends GameObject {
 
-    constructor(world, x, y, navgrid) {
-        super(world, x, y, 0.5);
-        this.type = "soldier";
-        this.navgrid = navgrid;
+    constructor(world, radius, x, y, baseSpeed, creator) {
+        super(world, x, y, radius, creator);
+        this.baseSpeed = baseSpeed;
     }
 
     update() {
-        
-        let nvx = Math.floor(this.x + this.navgrid.vectors.length / 2);
-        let nvy = Math.floor(this.y + this.navgrid.vectors[nvx].length / 2);
-        let vector = this.navgrid.vectors[nvx][nvy];
-        let cost = World.getNavCost(map[nvx][nvy]);
 
-        if(vector) {
+        if(this.navgrid) {
 
-            // Stop pathfinding once decently close to prevent clusterfucking
-            let coeff = 2;
-            let sqDistToTarget = (this.x - this.navgrid.targetX) * (this.x - this.navgrid.targetX) + (this.y - this.navgrid.targetY) * (this.y - this.navgrid.targetY);
-            if(!this.navgrid.cluster && sqDistToTarget < 16) {
-                coeff = Math.max(sqDistToTarget - 12, 0);
+            let tileX = Math.floor(this.x + this.navgrid.vectors.length / 2);
+            let tileY = Math.floor(this.y + this.navgrid.vectors[tileX].length / 2);
+            let vector = this.navgrid.vectors[tileX][tileY];
+
+            if(vector) {
+
+                let speed = this.baseSpeed;
+                let cost = World.getNavCost(map[tileX][tileY]);
+                let sqDistToTarget = (this.x - this.navgrid.targetX) * (this.x - this.navgrid.targetX) + (this.y - this.navgrid.targetY) * (this.y - this.navgrid.targetY);
+
+                if(!navgrid.cluster && sqDistToTarget < 16) {
+                    speed = Math.max(sqDistToTarget - 12, 0);    
+                }
+
+                speed /= cost;
+
+                this.dx = vector[0] * speed;
+                this.dy = vector[1] * speed;
+
             }
-
-            this.dx = vector[0] * coeff / cost;
-            this.dy = vector[1] * coeff / cost;
 
         }
 
         super.update();
 
+    }
+
+    static calcPathfindingGrid(x, y, cluster) {
+        return this.world.calculateNavGrid(x, y, this.navCosts, cluster);
+    }
+
+}
+
+class Soldier extends DynamicObject {
+
+    constructor(world, x, y, creator) {
+        super(world, 0.5, x, y, SOLDIER_BASE_SPEED, creator);
+        this.type = "Soldier";
+    }
+
+    update() {
+        super.update();
     }
 
 }
@@ -133,16 +162,12 @@ class World {
 
         // Clear objects
         this.objects = {
-            soldier: {}
+            Soldier: {}
         };
-
+        
         this.objectsFlat = {};
-
         this.nextObjectID = 0;
 
-        // Real quick
-        this.navgrid = this.calculateNavGrid(0, 0, false);
-    
         // Start update tick
         setInterval(() => this.update(), 50);
     
@@ -183,7 +208,7 @@ class World {
             for(let i = 0; i < 10; i++) {
                 let angle = Math.random() * 2 * Math.PI;
                 let dist = Math.random()  * 5;
-                let soldier = new Soldier(this, message.x + Math.cos(angle) * dist, message.y + Math.sin(angle) * dist, this.navgrid);
+                let soldier = new Soldier(this, message.x + Math.cos(angle) * dist, message.y + Math.sin(angle) * dist, this.navgrid, player);
                 objectIDs.push(this.addObject(soldier));
                 this.addObject(soldier);
             }
@@ -354,7 +379,7 @@ class World {
 
     }
 
-    calculateCostGrid(x, y) {
+    calculateCostGrid(x, y, navCosts) {
         
         let costGrid = Util.make2DArray(this.width, this.height);
         let frontier = [[x, y]];
@@ -369,7 +394,7 @@ class World {
                 let x = elem[0];
                 let y = elem[1];
                 let curCost = costGrid[x][y];
-                let curNavCost = World.getNavCost(this.data[x][y]);
+                let curNavCost = navCosts[this.data[x][y]];
 
                 for(let dx = -1; dx <= 1; dx++) {
                     for(let dy = -1; dy <= 1; dy++) {
@@ -382,7 +407,7 @@ class World {
                         let nextY = y + dy;
                         
                         if(this.containsIndex(nextX, nextY)) {
-                            let nextNavCost = World.getNavCost(this.data[nextX][nextY]);
+                            let nextNavCost = navCosts[this.data[nextX][nextY]];
                             if(costGrid[nextX][nextY] === undefined && nextNavCost >= curNavCost) {
                                 frontier.unshift([nextX, nextY]);
                                 costGrid[nextX][nextY] = curCost + nextNavCost;
@@ -445,7 +470,7 @@ class World {
 
     }
 
-    calculateNavGrid(x, y, cluster) {
+    calculateNavGrid(x, y, navCosts, cluster) {
 
         if(!this.containsPoint(x, y)) {
             throw new Error("Can't calculate navgrid to point outside of map.");
@@ -459,7 +484,7 @@ class World {
 
         let vectors = World.calculateVectors(resolution);
         let coefficients = World.calculateVectorCoefficients(vectors, resolution);
-        let costGrid = this.calculateCostGrid(cx, cy);
+        let costGrid = this.calculateCostGrid(cx, cy, navCosts);
         let vectorGrid = this.calculateVectorGrid(vectors, coefficients, costGrid, resolution);
 
         return {

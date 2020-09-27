@@ -125,7 +125,7 @@ class World {
     addObject(id, object) {
 
         let classes = {
-            "soldier": Soldier
+            "Soldier": Soldier
         };
 
         this.objects[id] = new (classes[object.type])(object);
