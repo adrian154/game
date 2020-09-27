@@ -165,7 +165,7 @@ class Renderer {
         this.ctx = this.canvas.getContext("2d");
 
         // Initial camera settings
-        this.scale = 1;
+        this.scale = 4;
         this.cameraX = 0;
         this.cameraY = 0;
         this.cameraAngle = 0;
@@ -372,9 +372,19 @@ class Input {
             this.ctrlHeld = state;
         }
 
+        if(state && event.key === "d" && this.ctrlHeld) {
+            this.renderer.cameraAngle = 0;
+            this.renderer.scale = 4.0;
+            this.renderer.cameraX = 0.0;
+            this.renderer.cameraY = 0.0;
+            event.preventDefault();
+        }
+
         if(event.key === "Escape") {
             this.currentTask = InputTasks.NONE;
+            event.preventDefault();
         }
+
     }
     
     handleScroll(event) {
