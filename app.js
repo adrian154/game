@@ -1,28 +1,8 @@
-// Main app class
-
 // Dependencies
 const Express = require("express");
 const WebSocket = require("ws");
+const Util = require("./util.js");
 const map = require("./map.json");
-
-// Constants
-const Tiles = {
-    WATER: 0,
-    GRASS: 1
-};
-
-Object.freeze(Tiles);
-
-const make2DArray = function(xSize, ySize) {
-    let result = new Array(xSize);
-    for(let i = 0; i < xSize; i++) {
-        result[i] = new Array(ySize);
-        for(let j = 0; j < ySize; j++) {
-            result[i][j] = undefined;
-        }
-    }
-    return result;
-};
 
 class App {
 
@@ -45,18 +25,109 @@ class App {
 
 }
 
+class GameObject {
+
+    constructor(world, x, y) {
+        this.world = world;
+        this.x = x;
+        this.y = y;
+        this.dx = 0;
+        this.dy = 0;
+        this.type = "bogus";
+    }
+
+    update() {
+        
+        let nextX = this.x + this.dx * Util.TIMESTEP;    
+        let nextY = this.y + this.dy * Util.TIMESTEP;
+
+        // Run collision checks
+        for(let other of Object.values(this.world.objectsFlat)) {
+
+            if(other === this) continue;
+
+            let dx = other.x - this.x;
+            let dy = other.y - this.y;
+            let distSquared = dx * dx + dy * dy;
+            if(distSquared < 1) {
+             
+                let dist = Math.sqrt(distSquared);
+                let overlap = (1 - dist) / 2;
+                nextX -= overlap * dx / dist;
+                nextY -= overlap * dy / dist;
+
+            }
+
+        }
+
+        this.x = nextX;
+        this.y = nextY;
+
+    }
+
+    toJSON() {
+        return {x: this.x, y: this.y, dx: this.dx, dy: this.dy, type: this.type};
+    }
+
+}
+
+class Soldier extends GameObject {
+
+    constructor(world, x, y, navgrid) {
+        super(world, x, y);
+        this.type = "soldier";
+        this.navgrid = navgrid;
+    }
+
+    update() {
+        
+        let nvx = Math.floor(this.x + this.navgrid.length / 2);
+        let nvy = Math.floor(this.y + this.navgrid[nvx].length / 2);
+        let vector = this.navgrid[nvx][nvy];
+
+        if(vector) {
+            this.dx = vector[0] * 2;
+            this.dy = vector[1] * 2;
+        }
+
+        super.update();
+
+    }
+
+}
+
 class World {
 
     constructor(data, game) {
+
+        // Set up map data
         this.data = data;
         this.width = data.length;
         this.height = data[0].length;
+
+        // Attach dependencies
         this.game = game;
-        this.objects = [];
+
+        // Clear objects
+        this.objects = {
+            soldier: {}
+        };
+
+        this.objectsFlat = {};
+
         this.nextObjectID = 0;
 
+        // Real quick
         this.navgrid = this.calculateNavGrid(0, 0);
+    
+        // Start update tick
         setInterval(() => this.update(), 50);
+    
+    }
+
+    getNextObjectID() {
+        this.nextObjectID++;
+        return this.nextObjectID;
     }
 
     // It's assumed that the map is rectangular
@@ -70,31 +141,21 @@ class World {
         return x > -this.width / 2 && y > -this.height / 2 && x < this.width / 2 && y < this.height / 2;
     }
 
-    addSoldier(x, y) {
-
-        let soldier = {
-            type: "soldier",
-            x: x,
-            y: y,
-            dx: 0,
-            dy: 0,
-            id: this.nextObjectID
-        };
-
-        this.objects.push(soldier);
-        this.broadcastObjectCreation(soldier);
-        this.nextObjectID++;
-        
+    addObject(object) {
+        let id = this.getNextObjectID();
+        this.objects[object.type][id] = object;
+        this.objectsFlat[id] = object;
+        this.broadcastObjectCreation(id, object);
     }
 
     // Add an object based on a message payload
     handlePlaceSwarm(message, socket) {
 
         // Add tons of soldiers
-        for(let i = 0; i < 1; i++) {
+        for(let i = 0; i < 10; i++) {
             let angle = Math.random() * 2 * Math.PI;
-            let dist = Math.random()  * 20;
-            this.addSoldier(message.x + Math.cos(angle) * dist, message.y + Math.sin(angle) * dist);
+            let dist = Math.random()  * 5;
+            this.addObject(new Soldier(this, message.x + Math.cos(angle) * dist, message.y + Math.sin(angle) * dist, this.navgrid));
         }
 
     }
@@ -103,10 +164,11 @@ class World {
         this.navgrid = this.calculateNavGrid(message.x, message.y);
     }
 
-    broadcastObjectCreation(object) {
+    broadcastObjectCreation(id, object) {
 
         let text = JSON.stringify({
             type: "addObject",
+            id: id,
             object: object
         });
 
@@ -116,7 +178,7 @@ class World {
 
     }
 
-    broadcastObjectUpdate(object) {
+    broadcastObjectUpdates() {
 
         let text = JSON.stringify({
             type: "updateObjects",
@@ -132,21 +194,32 @@ class World {
     // Move everything
     update() {
 
-        // Update soldiers (pathfind)
-        this.broadcastObjectUpdate();
+        let startTime = Date.now();
+
+        // Loop through objects, update
+        for(let type of Object.keys(this.objects)) {
+            for(let id of Object.keys(this.objects[type])) {
+                this.objects[type][id].update();
+            }
+        }
+
+        let endTime = Date.now();
+        //console.log("Took " + (endTime - startTime) + " ms");
+
+        this.broadcastObjectUpdates();
 
     }
 
     static getNavCost(tileType) {
         return ({
-            [Tiles.WATER]: 10, // placeholder
-            [Tiles.GRASS]: 1 
+            [Util.Tiles.WATER]: 10, // placeholder
+            [Util.Tiles.GRASS]: 1 
         })[tileType];
     }
 
     static calculateVectors(delta) {
 
-        let vectors = make2DArray(delta * 2 + 1, delta * 2 + 1);
+        let vectors = Util.make2DArray(delta * 2 + 1, delta * 2 + 1);
         
         for(let x = -delta; x <= delta; x++) {
             for(let y = -delta; y <= delta; y++) {
@@ -168,7 +241,7 @@ class World {
 
     static calculateVectorCoefficients(vectors, delta) {
 
-        let coefficients = make2DArray(delta * 2 + 1, delta * 2 + 1);
+        let coefficients = Util.make2DArray(delta * 2 + 1, delta * 2 + 1);
 
         for(let targetDx = -delta; targetDx <= delta; targetDx++) {
             for(let targetDy = -delta; targetDy <= delta; targetDy++) {
@@ -248,7 +321,7 @@ class World {
 
     calculateCostGrid(x, y) {
         
-        let costGrid = make2DArray(this.width, this.height);
+        let costGrid = Util.make2DArray(this.width, this.height);
         let frontier = [[x, y]];
         costGrid[x][y] = 0;
 
@@ -295,7 +368,7 @@ class World {
 
     calculateVectorGrid(vectors, coefficients, costGrid, delta) {
 
-        let vectorGrid = make2DArray(this.width, this.height);
+        let vectorGrid = Util.make2DArray(this.width, this.height);
 
         for(let x = 0; x < vectorGrid.length; x++) {
             for(let y = 0; y < vectorGrid[x].length; y++) {

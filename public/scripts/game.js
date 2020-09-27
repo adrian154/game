@@ -42,9 +42,8 @@ class Soldier {
         ctx.save();
         ctx.fillStyle = "#ffff00";
         ctx.translate(this.x, this.y);
-        //ctx.fillRect(-0.5, -0.5, 1, 1);
         ctx.beginPath();
-        ctx.arc(0, 0, 2, 0, 2 * Math.PI);
+        ctx.arc(0, 0, 0.5, 0, 2 * Math.PI);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
@@ -54,10 +53,17 @@ class Soldier {
 
 class World {
 
-    constructor(data) {
+    constructor(data, objects) {
         
         this.data = data;
-        this.objects = [];
+
+        // Unpack objects
+        this.objects = {};
+        for(let type of Object.keys(objects)) {
+            for(let id of Object.keys(objects[type])) {
+                this.addObject(id, objects[type][id]);
+            }
+        }
 
         // It's assumed that the map is square
         this.width = data.length;
@@ -117,32 +123,31 @@ class World {
         ctx.restore();
     }
 
-    addObject(object) {
+    addObject(id, object) {
+
         let classes = {
             "soldier": Soldier
         };
 
-        this.objects.push(new classes[object.type](object));
+        this.objects[id] = new (classes[object.type])(object);
+
     }
 
     renderObjects(ctx) {
-        for(let object of this.objects) {
+    
+        for(let object of Object.values(this.objects)) {
             object.render(ctx);
         }
+    
     }
 
     updateObjects(objects) {
         
-        // Awful O(N^2) 
-        for(let object of objects) {
-
-            // Find element in objects
-            for(let localObject of this.objects) {
-                if(localObject.id === object.id) {
-                    for(let [key, value] of Object.entries(object)) {
-                        localObject[key] = value;
-                    }
-                }
+        for(let type of Object.keys(objects)) {
+            
+            let objectsOfType = objects[type];
+            for(let id of Object.keys(objectsOfType)) {
+                this.objects[id].update(objects[type][id]);
             }
 
         }
@@ -367,8 +372,6 @@ class Input {
         // Don't listen to repeat events
         if(event.repeat) return;
 
-        console.log(event.key);
-
         if(event.key === "Control") {
             this.ctrlHeld = state;
         }
@@ -433,7 +436,8 @@ class Input {
         
         if(this.currentTask === InputTasks.PLACING_SWARM) {
             this.game.remote.placeSwarm(worldCoords[0], worldCoords[1]);
-            this.currentTask = InputTasks.NONE;
+            //this.currentTask = InputTasks.NONE;
+
         } else if(this.currentTask === InputTasks.SETTING_TARGET) {
             this.game.remote.setTarget(worldCoords[0], worldCoords[1]);
             this.currentTask = InputTasks.NONE;
@@ -526,11 +530,7 @@ class Game {
         this.state = GameStates.GAME_RUNNING;
         
         // Set up world
-        this.world = new World(message.mapData);
-
-        for(let object of message.objects) {
-            this.world.addObject(object);
-        }
+        this.world = new World(message.mapData, message.objects);
 
         // Remove name pick fields
         this.pickNameInput.remove();
@@ -542,7 +542,7 @@ class Game {
     }
 
     handleAddObject(message) {
-        this.world.addObject(message.object);
+        this.world.addObject(message.id, message.object);
     }
 
     handleUpdateWorld(message) {
