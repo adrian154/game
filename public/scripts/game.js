@@ -327,6 +327,8 @@ class Input {
         this.currentTask = InputTasks.NONE;
         this.ctrlHeld = false; // ctrl toggles rotation mode
 
+        this.unitElements = {};
+
         // Add event listeners..
         
         // ..on canvas
@@ -447,6 +449,22 @@ class Input {
 
     }
 
+    handleAddUnit(message) {
+
+        let unit = message.unit; 
+
+        let elem = document.createElement("p");
+        elem.appendChild(document.createTextNode(unit.type));
+        document.getElementById("unitList").appendChild(elem);
+        console.log(elem);
+
+        this.unitElements[message.id] = {
+            unit: unit,   
+            elem: elem 
+        };
+    
+    }
+
 }
 
 class Remote {
@@ -558,6 +576,10 @@ class Game {
         document.getElementById("chatArea").value += message.text + "\n";
     }
 
+    handleAddUnit(message) {
+        this.input.handleAddUnit(message);
+    }
+
     handleMessage(event) {
 
         let message = JSON.parse(event.data);
@@ -569,7 +591,8 @@ class Game {
             "updatePlayerList": message => this.handleUpdatePlayerList(message),
             "updateWorld": message => this.handleUpdateWorld(message),
             "updateObjects": message => this.handleUpdateObjects(message),
-            "chatMessage": message => this.handleChatMessage(message)
+            "chatMessage": message => this.handleChatMessage(message),
+            "addUnit": message => this.handleAddUnit(message)
         })[message.type](message);
 
     }

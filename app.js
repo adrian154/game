@@ -130,6 +130,7 @@ class Soldier extends DynamicObject {
     constructor(world, x, y, creator) {
         super(world, 0.5, x, y, SOLDIER_BASE_SPEED, creator);
         this.type = "Soldier";
+        this.navCosts = SOLDIER_NAV_COSTS;
     }
 
     update() {
@@ -140,8 +141,7 @@ class Soldier extends DynamicObject {
 
 class Unit {
 
-    constructor(id, type, objectIDs) {
-        this.id = id;
+    constructor(type, objectIDs) {
         this.type = type;
         this.objects = objectIDs;
     }
@@ -164,7 +164,7 @@ class World {
         this.objects = {
             Soldier: {}
         };
-        
+
         this.objectsFlat = {};
         this.nextObjectID = 0;
 
@@ -197,6 +197,16 @@ class World {
         return id;
     }
 
+    removeObjectLocal(id) {
+    
+        delete this.objectsFlat[id];
+    
+        for(let type of Object.values(this.objects)) {
+            delete this.objects[type][id];
+        }
+    
+    }
+
     // Add an object based on a message payload
     handlePlaceUnit(message, player) {
         
@@ -215,8 +225,8 @@ class World {
         
         }
 
-        let unit = new Unit(this.getNextObjectID(), message.unitType, objectIDs);
-        player.units.push(unit);
+        let unit = new Unit(message.unitType, objectIDs);
+        return unit;
 
     }
 
@@ -413,9 +423,11 @@ class World {
                                 costGrid[nextX][nextY] = curCost + nextNavCost;
                                 numAdded++;
                             }
+
                         }
 
                     }
+
                 }
 
             }
@@ -522,7 +534,7 @@ class GameServer {
         let player = {
             name: message.name,
             id: this.nextPlayerID,
-            units: [],
+            units: {},
             socket: socket
         };
 
@@ -559,25 +571,25 @@ class GameServer {
 
     addUnit(player, unit) {
     
+        let id = this.map.getNextObjectID();
+        player.units[id] = unit;
+
         player.socket.send(JSON.stringify({
             type: "addUnit",
-            unit: unit
+            unit: unit,
+            id: id
         }));
-    
+
+        return id;
+
+    }
+
+    destroyObject(id) {
+        // TODO
     }
 
     destroyUnit(player, id) {
-        
-        let idx = player.units.find(elem => elem.id === id);
-        player.unit.splice(idx, 1);
-
-        if(idx) {
-            player.socket.send(JSON.stringify({
-                type: "destroyUnit",
-                id: id    
-            }));
-        }
-
+        // TODO
     }
 
     handleMessage(message, socket) {
@@ -605,7 +617,8 @@ class GameServer {
     }
 
     handlePlaceUnit(message, socket) {
-        this.map.handlePlaceUnit(message, socket.player);
+        let unit = this.map.handlePlaceUnit(message, socket.player);
+        this.addUnit(socket.player, unit);
     }
 
     handleChatMessage(message, socket) {
@@ -630,8 +643,22 @@ class GameServer {
         this.players.splice(index, 1);
         this.broadcastUpdatePlayerList();
 
-        if(socket.player)
+        if(socket.player) {
+            
             this.broadcastChatMessage(`Player ${socket.player.name} left the game`);
+            
+            // Destroy units
+            for(let unit of Object.values(socket.player.units)) {
+                for(let objectID of unit.objects) {
+
+                    // Delete from world
+                    
+                    // Destroy
+
+                }
+            }
+
+        }
 
     }
     
