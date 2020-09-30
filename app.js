@@ -33,59 +33,31 @@ class App {
 
 class GameObject {
 
-    constructor(world, x, y, radius, creator) {
-        this.world = world;
+    constructor(x, y, radius) {
         this.x = x;
         this.y = y;
-        this.dx = 0;
-        this.dy = 0;
         this.radius = radius;
-        this.creator = creator;
     }
 
     update() {
         
-        let nextX = this.x + this.dx * Util.TIMESTEP;    
-        let nextY = this.y + this.dy * Util.TIMESTEP;
-
-        // Run collision checks
-        for(let other of Object.values(this.world.objectsFlat)) {
-
-            if(other === this) continue;
-
-            let dx = other.x - this.x;
-            let dy = other.y - this.y;
-            let distSquared = dx * dx + dy * dy;
-            let minDist = this.radius + other.radius;
-            if(distSquared < minDist * minDist) {
-             
-                let dist = Math.sqrt(distSquared);
-                let overlap = (minDist - dist) / 2;
-                nextX -= overlap * dx / dist;
-                nextY -= overlap * dy / dist;
-                other.x += overlap * dx / dist;
-                other.y += overlap * dy / dist;
-
-            }
-
-        }
-
-        this.x = nextX;
-        this.y = nextY;
+        this.nextX = this.x + this.dx * Util.TIMESTEP;    
+        this.nextY = this.y + this.dy * Util.TIMESTEP;
 
     }
 
     toJSON() {
-        return {x: this.x, y: this.y, dx: this.dx, dy: this.dy, type: this.type};
+        return {x: this.x, y: this.y, type: this.type};
     }
 
 }
 
 class DynamicObject extends GameObject {
 
-    constructor(world, radius, x, y, baseSpeed, creator) {
-        super(world, x, y, radius, creator);
+    constructor(x, y, radius, baseSpeed, navCosts) {
+        super(x, y, radius);
         this.baseSpeed = baseSpeed;
+        this.navCosts = navCosts;
     }
 
     update() {
@@ -99,7 +71,7 @@ class DynamicObject extends GameObject {
             if(vector) {
 
                 let speed = this.baseSpeed;
-                let cost = World.getNavCost(map[tileX][tileY]);
+                let cost = this.navCosts(map[tileX][tileY]);
                 let sqDistToTarget = (this.x - this.navgrid.targetX) * (this.x - this.navgrid.targetX) + (this.y - this.navgrid.targetY) * (this.y - this.navgrid.targetY);
 
                 if(!navgrid.cluster && sqDistToTarget < 16) {
@@ -127,14 +99,17 @@ class DynamicObject extends GameObject {
 
 class Soldier extends DynamicObject {
 
-    constructor(world, x, y, creator) {
-        super(world, 0.5, x, y, SOLDIER_BASE_SPEED, creator);
+    constructor(x, y) {
+        super(x, y, 0.5, SOLDIER_BASE_SPEED, SOLDIER_NAV_COSTS);
         this.type = "Soldier";
-        this.navCosts = SOLDIER_NAV_COSTS;
     }
 
     update() {
+     
+        // Maybe attacking?
+
         super.update();
+
     }
 
 }
